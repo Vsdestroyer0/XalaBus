@@ -1,0 +1,24 @@
+CREATE TABLE RouteEntity (
+    id TEXT NOT NULL PRIMARY KEY,
+    name TEXT NOT NULL
+);
+
+CREATE TABLE GeometryEntity (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    routeId TEXT NOT NULL,
+    direction TEXT NOT NULL,
+    polyline TEXT NOT NULL,
+    FOREIGN KEY (routeId) REFERENCES RouteEntity(id)
+);
+
+insertRoute:
+INSERT OR REPLACE INTO RouteEntity(id, name) VALUES (?, ?);
+
+insertGeometry:
+INSERT OR REPLACE INTO GeometryEntity(routeId, direction, polyline) VALUES (?, ?, ?);
+
+selectAllRoutes:
+SELECT * FROM RouteEntity;
+
+selectGeometryByRoute:
+SELECT * FROM GeometryEntity WHERE routeId = ?;
