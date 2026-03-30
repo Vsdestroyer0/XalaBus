@@ -1,6 +1,7 @@
 package com.example.xalabus.data.repository
 
-import com.example.xalabus.database.AppDatabase
+import com.example.xalabus.DBD.AppDatabase
+import com.example.xalabus.data.model.RouteJson
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.encodeToString
 
@@ -8,7 +9,6 @@ class RouteRepository(private val db: AppDatabase) {
     private val queries = db.appDatabaseQueries
 
     suspend fun checkAndPrepopulate(jsonString: String) {
-        // Solo insertamos si la base de datos está vacía
         if (queries.selectAllRoutes().executeAsList().isEmpty()) {
             val routes = Json.decodeFromString<List<RouteJson>>(jsonString)
 

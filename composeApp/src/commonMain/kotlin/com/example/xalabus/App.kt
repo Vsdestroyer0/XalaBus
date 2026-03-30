@@ -1,48 +1,44 @@
-package com.example.xalabus
+package com.example.xalabus.ui
 
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.foundation.Image
-import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.safeContentPadding
-import androidx.compose.material3.Button
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
+import androidx.compose.foundation.layout.*
+import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.tooling.preview.Preview
-import org.jetbrains.compose.resources.painterResource
-
-import xalabus.composeapp.generated.resources.Res
-import xalabus.composeapp.generated.resources.compose_multiplatform
+import androidx.compose.ui.unit.dp
+import com.example.xalabus.XalaContext
+import com.example.xalabus.db.DriverFactory
+import com.example.xalabus.ui.viewmodel.RouteViewModel
 
 @Composable
-@Preview
-fun App() {
+fun App(driverFactory: DriverFactory) {
+    // Inicializamos dependencias a través del Context
+    val repository = remember { XalaContext.getRepository(driverFactory) }
+    val viewModel = remember { RouteViewModel(repository) }
+    val isLoaded by viewModel.isDataLoaded.collectAsState()
+
+    // Disparamos la carga de datos al iniciar la App
+    LaunchedEffect(Unit) {
+        viewModel.initializeData()
+    }
+
+    // Aquí usamos el tema que ya tienes en tu carpeta ui/theme
     MaterialTheme {
-        var showContent by remember { mutableStateOf(false) }
-        Column(
-            modifier = Modifier
-                .background(MaterialTheme.colorScheme.primaryContainer)
-                .safeContentPadding()
-                .fillMaxSize(),
-            horizontalAlignment = Alignment.CenterHorizontally,
+        Surface(
+            modifier = Modifier.fillMaxSize(),
+            color = MaterialTheme.colorScheme.background
         ) {
-            Button(onClick = { showContent = !showContent }) {
-                Text("Click me!")
-            }
-            AnimatedVisibility(showContent) {
-                val greeting = remember { Greeting().greet() }
-                Column(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                ) {
-                    Image(painterResource(Res.drawable.compose_multiplatform), null)
-                    Text("Compose: $greeting")
+            if (!isLoaded) {
+                Box(contentAlignment = Alignment.Center) {
+                    CircularProgressIndicator()
+                    Text(
+                        text = "Cargando rutas de Xalapa...",
+                        modifier = Modifier.padding(top = 80.dp)
+                    )
                 }
+            } else {
+                // Aquí es donde llamarás a tu pantalla de Home o Map mas adelante
+                Text("¡XalaBus está listo para navegar!")
             }
         }
     }

@@ -89,8 +89,10 @@ dependencies {
 sqldelight {
     databases {
         create("AppDatabase") {
-            packageName.set("com.example.xalabus.db")
-            srcDirs.setFrom("src/commonMain/kotlin")
+            // Generamos el código en este paquete
+            packageName.set("com.example.xalabus.DBD")
+            // Le decimos que busque los archivos .sq en la carpeta que ya creaste
+            srcDirs.setFrom("src/commonMain/kotlin/sqldelight")
         }
     }
 }
