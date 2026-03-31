@@ -29,6 +29,10 @@ class RouteViewModel(
     private val _routes = MutableStateFlow<List<RouteEntity>>(emptyList())
     val routes: StateFlow<List<RouteEntity>> = _routes
 
+    // Entidad de la ruta seleccionada actualmente
+    private val _selectedRoute = MutableStateFlow<RouteEntity?>(null)
+    val selectedRoute: StateFlow<RouteEntity?> = _selectedRoute
+
     // Puntos [Lng, Lat] de la ruta que el usuario seleccionó actualmente
     private val _selectedRoutePoints = MutableStateFlow<List<List<List<Double>>>>(emptyList())
     val selectedRoutePoints: StateFlow<List<List<List<Double>>>> = _selectedRoutePoints
@@ -69,6 +73,9 @@ class RouteViewModel(
     fun selectRoute(routeId: String) {
         viewModelScope.launch {
             try {
+                // Buscamos la entidad de la ruta en la lista cargada
+                _selectedRoute.value = _routes.value.find { it.id == routeId }
+                
                 val points = getRoutePoints(routeId)
                 _selectedRoutePoints.value = points
             } catch (e: Exception) {

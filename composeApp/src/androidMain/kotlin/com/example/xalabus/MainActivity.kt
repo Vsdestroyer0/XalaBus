@@ -8,11 +8,15 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.tooling.preview.Preview
 import com.example.xalabus.db.DriverFactory
-import com.example.xalabus.core.util.AndroidMapFileManager // Asegúrate de importar tu nueva clase
+import com.example.xalabus.core.util.AndroidMapFileManager
 import com.example.xalabus.ui.App
+import org.maplibre.android.MapLibre
+import org.maplibre.android.WellKnownTileServer
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
+        // Inicializar MapLibre antes de setContent
+        MapLibre.getInstance(this, null, WellKnownTileServer.MapLibre)
         enableEdgeToEdge()
         super.onCreate(savedInstanceState)
 
