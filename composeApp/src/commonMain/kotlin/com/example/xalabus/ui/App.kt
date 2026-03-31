@@ -1,5 +1,6 @@
 package com.example.xalabus.ui
 
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
@@ -9,6 +10,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.example.xalabus.XalaContext
@@ -18,6 +20,10 @@ import com.example.xalabus.ui.home.HomeScreen
 import com.example.xalabus.ui.viewmodel.RouteViewModel
 import com.example.xalabus.ui.map.MapScreen
 import kotlinx.coroutines.launch
+import org.jetbrains.compose.resources.ExperimentalResourceApi
+import org.jetbrains.compose.resources.painterResource
+// Importación de recursos generados por el plugin de Compose Multiplatform
+import xalabus.composeapp.generated.resources.*
 
 @Composable
 fun LoadingScreen() {
@@ -45,11 +51,9 @@ fun App(
     val isLoaded by viewModel.isDataLoaded.collectAsState()
     var showMap by remember { mutableStateOf(false) }
 
-    // Estado del modo oscuro
     val systemDark = isSystemInDarkTheme()
     var isDarkMode by remember { mutableStateOf(systemDark) }
 
-    // Estados del menú lateral
     val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
     val scope = rememberCoroutineScope()
 
@@ -89,7 +93,6 @@ fun App(
                     }
                 ) {
                     if (!showMap) {
-                        // Llamada corregida a HomeScreen
                         HomeScreen(
                             viewModel = viewModel,
                             onOpenDrawer = { scope.launch { drawerState.open() } },
@@ -99,7 +102,6 @@ fun App(
                             }
                         )
                     } else {
-                        // Nueva vista combinada: Mapa + Detalles del camión
                         MapDetailView(
                             fileManager = fileManager,
                             viewModel = viewModel,
@@ -113,7 +115,7 @@ fun App(
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalResourceApi::class)
 @Composable
 fun MapDetailView(
     fileManager: MapFileManager,
@@ -124,9 +126,13 @@ fun MapDetailView(
     val selectedRoute by viewModel.selectedRoute.collectAsState()
     val scaffoldState = rememberBottomSheetScaffoldState()
 
+    val routeId = selectedRoute?.id ?: ""
+    // Ruta exacta relativa a composeResources
+    val imagePath = "drawable/bus_$routeId.jpg"
+
     BottomSheetScaffold(
         scaffoldState = scaffoldState,
-        sheetPeekHeight = 180.dp,
+        sheetPeekHeight = 200.dp,
         sheetContainerColor = MaterialTheme.colorScheme.surface,
         sheetContent = {
             Column(
@@ -144,13 +150,24 @@ fun MapDetailView(
                 Spacer(Modifier.height(16.dp))
 
                 Card(
-                    modifier = Modifier.fillMaxWidth().height(140.dp),
-                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
+                    modifier = Modifier.fillMaxWidth().height(160.dp),
+                    shape = MaterialTheme.shapes.large,
+                    elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
                 ) {
                     Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
-                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                            Icon(Icons.Default.DirectionsBus, null, Modifier.size(40.dp))
-                            Text("Foto del autobús no disponible", style = MaterialTheme.typography.labelMedium)
+                        if (routeId.isNotEmpty()) {
+                            // CORRECCIÓN: Forzamos el uso de la ruta como String
+                            // Asegúrate de que el import sea: org.jetbrains.compose.resources.painterResource
+                            val painter = painterResource(imagePath)
+
+                            Image(
+                                painter = painter,
+                                contentDescription = "Foto del camión",
+                                modifier = Modifier.fillMaxSize(),
+                                contentScale = ContentScale.Crop
+                            )
+                        } else {
+                            DefaultPlaceholder()
                         }
                     }
                 }
@@ -158,8 +175,16 @@ fun MapDetailView(
                 Spacer(Modifier.height(20.dp))
 
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                    InfoItem(Icons.Default.Payments, "Tarifa", "$9.00")
-                    InfoItem(Icons.Default.Timer, "Frecuencia", "12-15 min")
+                    InfoItem(
+                        icon = Icons.Default.Payments,
+                        label = "Tarifa",
+                        value = "$9.00"
+                    )
+                    InfoItem(
+                        icon = Icons.Default.Timer,
+                        label = "Frecuencia",
+                        value = "15 min"
+                    )
                 }
 
                 Spacer(Modifier.height(24.dp))
@@ -174,7 +199,7 @@ fun MapDetailView(
                     shape = MaterialTheme.shapes.medium
                 )
                 Button(
-                    onClick = { /* Pendiente: Lógica de envío */ },
+                    onClick = { /* Lógica pendiente */ },
                     modifier = Modifier.align(Alignment.End).padding(top = 8.dp)
                 ) {
                     Icon(Icons.Default.Send, null, Modifier.size(18.dp))
@@ -205,6 +230,14 @@ fun MapDetailView(
                 Icon(Icons.Default.ArrowBack, contentDescription = "Regresar")
             }
         }
+    }
+}
+
+@Composable
+fun DefaultPlaceholder() {
+    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+        Icon(Icons.Default.DirectionsBus, null, Modifier.size(48.dp), tint = Color.LightGray)
+        Text("Foto no disponible", style = MaterialTheme.typography.labelSmall, color = Color.Gray)
     }
 }
 

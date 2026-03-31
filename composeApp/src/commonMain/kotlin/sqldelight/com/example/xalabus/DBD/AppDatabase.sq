@@ -1,6 +1,8 @@
 CREATE TABLE RouteEntity (
     id TEXT NOT NULL PRIMARY KEY,
-    name TEXT NOT NULL
+    name TEXT NOT NULL,
+    fare TEXT,        -- Añadir esto
+    frequency TEXT    -- Añadir esto
 );
 
 CREATE TABLE GeometryEntity (
