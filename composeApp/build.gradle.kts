@@ -6,6 +6,7 @@ plugins {
     alias(libs.plugins.composeMultiplatform)
     alias(libs.plugins.composeCompiler)
     alias(libs.plugins.sqldelight)
+    alias(libs.plugins.kotlinSerialization)
 }
 
 kotlin {
@@ -30,6 +31,9 @@ kotlin {
             implementation(libs.compose.uiToolingPreview)
             implementation(libs.androidx.activity.compose)
             implementation(libs.sqldelight.android.driver)
+            // Mapas
+            implementation(libs.maplibre.android)
+            implementation(libs.mapbox.geojson)
         }
 
         iosMain.dependencies {
@@ -42,11 +46,16 @@ kotlin {
             implementation(libs.compose.material3)
             implementation(libs.compose.ui)
             implementation(libs.compose.components.resources)
+            implementation(libs.compose.icons.extended)
+
             implementation(libs.androidx.lifecycle.viewmodelCompose)
             implementation(libs.androidx.lifecycle.runtimeCompose)
 
             implementation(libs.sqldelight.runtime)
             implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.6.2")
+            
+            // GeoJSON para commonMain
+            implementation(libs.spatialk.geojson)
         }
 
         commonTest.dependencies {

@@ -4,8 +4,9 @@ import kotlinx.serialization.Serializable
 
 @Serializable
 data class RouteJson(
-    val id: String,
+    val id: Long,
     val name: String,
+    val desc: String? = null,
     val variants: List<VariantJson>
 )
 

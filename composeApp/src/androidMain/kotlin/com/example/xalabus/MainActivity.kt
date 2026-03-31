@@ -8,6 +8,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.tooling.preview.Preview
 import com.example.xalabus.db.DriverFactory
+import com.example.xalabus.core.util.AndroidMapFileManager // Asegúrate de importar tu nueva clase
 import com.example.xalabus.ui.App
 
 class MainActivity : ComponentActivity() {
@@ -15,10 +16,15 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         super.onCreate(savedInstanceState)
 
+        // 1. Mantienes tu DriverFactory actual para SQLDelight
         val driverFactory = DriverFactory(applicationContext)
 
+        // 2. Creas el manejador de archivos para el mapa de Xalapa
+        val fileManager = AndroidMapFileManager(applicationContext)
+
         setContent {
-            App(driverFactory)
+            // Pasamos ambos a la función App de commonMain
+            App(driverFactory = driverFactory, fileManager = fileManager)
         }
     }
 }
@@ -26,6 +32,8 @@ class MainActivity : ComponentActivity() {
 @Preview
 @Composable
 fun AppAndroidPreview() {
-    val driverFactory = DriverFactory(LocalContext.current)
-    App(driverFactory)
+    val context = LocalContext.current
+    val driverFactory = DriverFactory(context)
+    val fileManager = AndroidMapFileManager(context)
+    App(driverFactory, fileManager)
 }
