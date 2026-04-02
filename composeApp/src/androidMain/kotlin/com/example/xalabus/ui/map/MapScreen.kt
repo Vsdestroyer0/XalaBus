@@ -36,12 +36,12 @@ actual fun MapScreen(
         modifier = Modifier.fillMaxSize()
     ) { mv ->
         mv.getMapAsync { map ->
+            // 1. Configuración de cámara inicial
             if (map.cameraPosition?.target?.latitude == 0.0) {
                 map.moveCamera(CameraUpdateFactory.newLatLngZoom(xalapaCenter, 13.0))
             }
 
             mapPath?.let { path ->
-                // Carga dinámica del estilo local según el tema
                 val styleFileName = if (isDarkMode) "style_dark.json" else "style.json"
                 val context = mv.context
                 val styleJson = context.assets.open(styleFileName).bufferedReader().use { it.readText() }
@@ -50,41 +50,42 @@ actual fun MapScreen(
                 val finalStyle = styleJson.replace("{mbtiles_path}", mapDir)
 
                 map.setStyle(Style.Builder().fromJson(finalStyle)) { style ->
-                    if (routePoints.isNotEmpty()) {
-                        val coords = routePoints.first().map { LatLng(it[1], it[0]) }
 
+                    // --- LÓGICA DE LA RUTA (LINEA) ---
+                    // Dibujamos únicamente el trayecto del autobús
+                    if (routePoints.isNotEmpty()) {
+                        // Tomamos el primer set de coordenadas (Ida o Vuelta)
+                        val rawCoords = routePoints.first()
                         val lineString = LineString.fromLngLats(
-                            coords.map { Point.fromLngLat(it.longitude, it.latitude) }
+                            rawCoords.map { Point.fromLngLat(it[0], it[1]) }
                         )
 
-                        val sourceId = "route-source"
-                        val layerId = "route-layer"
-                        val source = style.getSourceAs<GeoJsonSource>(sourceId)
+                        val routeSourceId = "route-source"
+                        val routeLayerId = "route-layer"
+                        val existingSource = style.getSourceAs<GeoJsonSource>(routeSourceId)
 
-                        if (source == null) {
-                            val newSource = GeoJsonSource(sourceId, lineString.toJson())
-                            style.addSource(newSource)
-
-                            // Azul chillón estilo Google Maps
-                            val googleBlue = android.graphics.Color.parseColor("#00e6ff")
-
-                            val lineLayer = LineLayer(layerId, sourceId).apply {
+                        if (existingSource == null) {
+                            style.addSource(GeoJsonSource(routeSourceId, lineString.toJson()))
+                            val lineLayer = LineLayer(routeLayerId, routeSourceId).apply {
                                 setProperties(
-                                    PropertyFactory.lineColor(googleBlue),
-                                    PropertyFactory.lineWidth(8f),
+                                    PropertyFactory.lineColor(android.graphics.Color.parseColor("#00e6ff")),
+                                    PropertyFactory.lineWidth(7f),
                                     PropertyFactory.lineCap(Property.LINE_CAP_ROUND),
-                                    PropertyFactory.lineJoin(Property.LINE_JOIN_ROUND),
-                                    PropertyFactory.lineBlur(0.4f)
+                                    PropertyFactory.lineJoin(Property.LINE_JOIN_ROUND)
                                 )
                             }
                             style.addLayer(lineLayer)
                         } else {
-                            source.setGeoJson(lineString.toJson())
+                            existingSource.setGeoJson(lineString.toJson())
                         }
 
-                        // Centrar la cámara en la ruta dibujada
-                        val bounds = LatLngBounds.Builder().includes(coords).build()
+                        // Ajuste automático de cámara para que la ruta sea visible
+                        val boundsCoords = rawCoords.map { LatLng(it[1], it[0]) }
+                        val bounds = LatLngBounds.Builder().includes(boundsCoords).build()
                         map.easeCamera(CameraUpdateFactory.newLatLngBounds(bounds, 120), 1000)
+                    } else {
+                        // Si no hay ruta seleccionada, limpiamos la capa anterior si existía
+                        style.getSourceAs<GeoJsonSource>("route-source")?.setGeoJson(LineString.fromLngLats(emptyList()).toJson())
                     }
                 }
             }

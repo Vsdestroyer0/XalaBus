@@ -5,18 +5,19 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Menu
-import androidx.compose.material.icons.filled.DirectionsBus
-import androidx.compose.material.icons.filled.ChevronRight
+import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.example.xalabus.ui.viewmodel.RouteViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -26,7 +27,9 @@ fun HomeScreen(
     onOpenDrawer: () -> Unit,
     onRouteClick: (String) -> Unit
 ) {
-    val routes by viewModel.routes.collectAsState()
+    // IMPORTANTE: Ahora observamos 'filteredRoutes' y 'searchQuery' del ViewModel
+    val routes by viewModel.filteredRoutes.collectAsState()
+    val searchText by viewModel.searchQuery.collectAsState()
 
     Scaffold(
         topBar = {
@@ -42,13 +45,10 @@ fun HomeScreen(
                     IconButton(onClick = onOpenDrawer) {
                         Icon(
                             imageVector = Icons.Default.Menu,
-                            contentDescription = "Abrir menú de configuración"
+                            contentDescription = "Abrir menú"
                         )
                     }
-                },
-                colors = TopAppBarDefaults.centerAlignedTopAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.surface
-                )
+                }
             )
         }
     ) { padding ->
@@ -57,12 +57,57 @@ fun HomeScreen(
                 .fillMaxSize()
                 .padding(padding)
         ) {
-            // Cabecera informativa opcional
+            // --- BARRA DE BÚSQUEDA ---
+            OutlinedTextField(
+                value = searchText,
+                onValueChange = { viewModel.onSearchQueryChanged(it) },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 8.dp),
+                textStyle = MaterialTheme.typography.bodyMedium.copy(
+                    fontSize = 14.sp
+                ),
+                placeholder = {
+                    Text(
+                        text = "Buscar ruta o colonia (Ej: 10001 o Avila Camacho)",
+                        style = MaterialTheme.typography.bodyMedium.copy(
+                            fontSize = 14.sp
+                        )
+                    )
+                },
+                leadingIcon = {
+                    Icon(
+                        imageVector = Icons.Default.Search,
+                        contentDescription = null,
+                        modifier = Modifier.size(20.dp) // Opcional: Icono un poco más pequeño
+                    )
+                },
+                trailingIcon = {
+                    if (searchText.isNotEmpty()) {
+                        IconButton(onClick = { viewModel.onSearchQueryChanged("") }) {
+                            Icon(
+                                imageVector = Icons.Default.Clear,
+                                contentDescription = "Limpiar búsqueda",
+                                modifier = Modifier.size(20.dp)
+                            )
+                        }
+                    }
+                },
+                shape = RoundedCornerShape(16.dp),
+                singleLine = true,
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedContainerColor = MaterialTheme.colorScheme.surface,
+                    unfocusedContainerColor = MaterialTheme.colorScheme.surface,
+                )
+            )
+            // Texto informativo que cambia si no hay resultados
             Text(
-                text = "Explora las rutas de Xalapa",
-                style = MaterialTheme.typography.bodyMedium,
-                modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
-                color = MaterialTheme.colorScheme.onSurfaceVariant
+                text = if (routes.isEmpty() && searchText.isNotEmpty())
+                    "No se encontraron rutas para '$searchText'"
+                else "Rutas disponibles en Xalapa",
+                style = MaterialTheme.typography.labelMedium,
+                modifier = Modifier.padding(horizontal = 20.dp, vertical = 4.dp),
+                color = MaterialTheme.colorScheme.primary
             )
 
             LazyColumn(
@@ -73,7 +118,7 @@ fun HomeScreen(
                 items(routes) { route ->
                     RouteCard(
                         name = route.name,
-                        onClick = { onRouteClick(route.id.toString()) }
+                        onClick = { onRouteClick(route.id) }
                     )
                 }
             }
@@ -92,7 +137,7 @@ fun RouteCard(
             .clickable(onClick = onClick),
         shape = MaterialTheme.shapes.medium,
         colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f)
         ),
         elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
     ) {
@@ -102,7 +147,6 @@ fun RouteCard(
                 .fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            // Icono de autobús representativo
             Surface(
                 color = MaterialTheme.colorScheme.primaryContainer,
                 shape = CircleShape,
@@ -122,13 +166,13 @@ fun RouteCard(
                 Text(
                     text = name,
                     style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.SemiBold,
-                    maxLines = 2
+                    fontWeight = FontWeight.Bold,
+                    maxLines = 3 // Aumentado para que quepa la descripción larga
                 )
                 Text(
-                    text = "Toca para ver el mapa y horarios",
+                    text = "Ver trazado en el mapa",
                     style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                    color = MaterialTheme.colorScheme.secondary
                 )
             }
 

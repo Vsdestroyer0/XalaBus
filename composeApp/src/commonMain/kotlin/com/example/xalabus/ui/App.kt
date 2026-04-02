@@ -24,6 +24,10 @@ import org.jetbrains.compose.resources.ExperimentalResourceApi
 import org.jetbrains.compose.resources.painterResource
 // Importación de recursos generados por el plugin de Compose Multiplatform
 import xalabus.composeapp.generated.resources.*
+import xalabus.composeapp.generated.resources.Res
+import androidx.compose.ui.graphics.ImageBitmap
+import org.jetbrains.compose.resources.decodeToImageBitmap
+
 
 @Composable
 fun LoadingScreen() {
@@ -127,8 +131,6 @@ fun MapDetailView(
     val scaffoldState = rememberBottomSheetScaffoldState()
 
     val routeId = selectedRoute?.id ?: ""
-    // Ruta exacta relativa a composeResources
-    val imagePath = "drawable/bus_$routeId.jpg"
 
     BottomSheetScaffold(
         scaffoldState = scaffoldState,
@@ -149,20 +151,38 @@ fun MapDetailView(
 
                 Spacer(Modifier.height(16.dp))
 
+                // ... dentro de MapDetailView
+
+                // Construcción de la ruta dinámica
+                val formattedId = routeId.padStart(3, '0')
+                val imagePath = "drawable/bus_$formattedId.jpg"
+
+                var imageBitmap by remember(imagePath) { mutableStateOf<ImageBitmap?>(null) }
+
+                LaunchedEffect(imagePath) {
+                    if (routeId.isNotEmpty()) {
+                        try {
+                            val bytes = Res.readBytes(imagePath)
+                            imageBitmap = bytes.decodeToImageBitmap()
+                        } catch (e: Exception) {
+                            imageBitmap = null
+                        }
+                    } else {
+                        imageBitmap = null
+                    }
+                }
+
                 Card(
                     modifier = Modifier.fillMaxWidth().height(160.dp),
                     shape = MaterialTheme.shapes.large,
                     elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
                 ) {
                     Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
-                        if (routeId.isNotEmpty()) {
-                            // CORRECCIÓN: Forzamos el uso de la ruta como String
-                            // Asegúrate de que el import sea: org.jetbrains.compose.resources.painterResource
-                            val painter = painterResource(imagePath)
-
+                        // 3. Validamos si el Bitmap cargó exitosamente
+                        if (imageBitmap != null) {
                             Image(
-                                painter = painter,
-                                contentDescription = "Foto del camión",
+                                bitmap = imageBitmap!!,
+                                contentDescription = "Foto del autobús $formattedId",
                                 modifier = Modifier.fillMaxSize(),
                                 contentScale = ContentScale.Crop
                             )
@@ -173,17 +193,19 @@ fun MapDetailView(
                 }
 
                 Spacer(Modifier.height(20.dp))
-
-                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
                     InfoItem(
                         icon = Icons.Default.Payments,
                         label = "Tarifa",
-                        value = "$9.00"
+                        value = selectedRoute?.fare?.let { if (it.isEmpty()) "N/A" else "$$it" } ?: "Consultando..."
                     )
                     InfoItem(
                         icon = Icons.Default.Timer,
                         label = "Frecuencia",
-                        value = "15 min"
+                        value = selectedRoute?.frequency?.let { if (it.isEmpty()) "N/A" else it } ?: "Consultando..."
                     )
                 }
 
@@ -199,7 +221,7 @@ fun MapDetailView(
                     shape = MaterialTheme.shapes.medium
                 )
                 Button(
-                    onClick = { /* Lógica pendiente */ },
+                    onClick = { /* Lógica reporte */ },
                     modifier = Modifier.align(Alignment.End).padding(top = 8.dp)
                 ) {
                     Icon(Icons.Default.Send, null, Modifier.size(18.dp))
@@ -211,18 +233,10 @@ fun MapDetailView(
         }
     ) { innerPadding ->
         Box(modifier = Modifier.padding(innerPadding).fillMaxSize()) {
-            MapScreen(
-                fileManager = fileManager,
-                viewModel = viewModel,
-                isDarkMode = isDarkMode
-            )
-
+            MapScreen(fileManager = fileManager, viewModel = viewModel, isDarkMode = isDarkMode)
             FilledIconButton(
                 onClick = onBack,
-                modifier = Modifier
-                    .padding(16.dp)
-                    .size(48.dp)
-                    .align(Alignment.TopStart),
+                modifier = Modifier.padding(16.dp).size(48.dp).align(Alignment.TopStart),
                 colors = IconButtonDefaults.filledIconButtonColors(
                     containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.9f)
                 )

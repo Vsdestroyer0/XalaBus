@@ -1,8 +1,8 @@
 CREATE TABLE RouteEntity (
     id TEXT NOT NULL PRIMARY KEY,
     name TEXT NOT NULL,
-    fare TEXT,        -- Añadir esto
-    frequency TEXT    -- Añadir esto
+    fare TEXT,        -- Asegúrate que esto exista
+    frequency TEXT     -- Asegúrate que esto exista
 );
 
 CREATE TABLE GeometryEntity (
@@ -13,8 +13,34 @@ CREATE TABLE GeometryEntity (
     FOREIGN KEY (routeId) REFERENCES RouteEntity(id)
 );
 
+
+-- Tabla para las paradas
+/** Ver después de lanzar la app, ya que no tenemos una base sólida de paradas
+
+CREATE TABLE StopEntity (
+    id TEXT NOT NULL PRIMARY KEY,
+    routeId TEXT NOT NULL, -- Cambiado de INTEGER a TEXT para coincidir con RouteEntity
+    lat REAL NOT NULL,
+    lng REAL NOT NULL,
+    FOREIGN KEY (routeId) REFERENCES RouteEntity(id)
+);
+
+-- Consultas para el Repositorio
+insertStop:
+INSERT OR REPLACE INTO StopEntity(id, routeId, lat, lng)
+VALUES (?, ?, ?, ?);
+
+selectAllStops:
+SELECT * FROM StopEntity;
+
+selectStopsByRoute:
+SELECT * FROM StopEntity
+WHERE routeId = ?;
+
+*/
+
 insertRoute:
-INSERT OR REPLACE INTO RouteEntity(id, name) VALUES (?, ?);
+INSERT OR REPLACE INTO RouteEntity(id, name, fare, frequency) VALUES (?, ?, ?, ?);
 
 insertGeometry:
 INSERT OR REPLACE INTO GeometryEntity(routeId, direction, polyline) VALUES (?, ?, ?);
@@ -24,3 +50,6 @@ SELECT * FROM RouteEntity;
 
 selectGeometryByRoute:
 SELECT * FROM GeometryEntity WHERE routeId = ?;
+
+getAllRoutes:
+SELECT * FROM RouteEntity;
