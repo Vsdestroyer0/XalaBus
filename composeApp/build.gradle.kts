@@ -34,10 +34,14 @@ kotlin {
             // Mapas
             implementation(libs.maplibre.android)
             implementation(libs.mapbox.geojson)
+            // Ktor engine para Android
+            implementation(libs.ktor.client.okhttp)
         }
 
         iosMain.dependencies {
             implementation(libs.sqldelight.native.driver)
+            // Ktor engine para iOS
+            implementation(libs.ktor.client.darwin)
         }
 
         commonMain.dependencies {
@@ -53,9 +57,15 @@ kotlin {
 
             implementation(libs.sqldelight.runtime)
             implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.6.2")
-            
+
             // GeoJSON para commonMain
             implementation(libs.spatialk.geojson)
+
+            // Supabase KT
+            implementation(libs.supabase.auth)
+            implementation(libs.supabase.postgrest)
+            // Ktor core (engines declarados por plataforma)
+            implementation(libs.ktor.client.core)
         }
 
         commonTest.dependencies {
@@ -98,9 +108,7 @@ dependencies {
 sqldelight {
     databases {
         create("AppDatabase") {
-            // Generamos el código en este paquete
             packageName.set("com.example.xalabus.DBD")
-            // Le decimos que busque los archivos .sq en la carpeta que ya creaste
             srcDirs.setFrom("src/commonMain/kotlin/sqldelight")
         }
     }
