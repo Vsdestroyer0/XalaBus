@@ -1,26 +1,32 @@
 package com.example.xalabus.ui.auth
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ArrowBack
-import androidx.compose.material.icons.filled.Email
-import androidx.compose.material.icons.filled.Lock
-import androidx.compose.material.icons.filled.Visibility
-import androidx.compose.material.icons.filled.VisibilityOff
+import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusDirection
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.input.ImeAction
-import androidx.compose.ui.text.input.KeyboardType
-import androidx.compose.ui.text.input.PasswordVisualTransformation
-import androidx.compose.ui.text.input.VisualTransformation
+import androidx.compose.ui.text.input.*
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+
+// ── Paleta XalaBus Dark ─────────────────────────────────────────────────────
+private val XalaBg      = Color(0xFF0A0A0A)
+private val XalaSurface = Color(0xFF161616)
+private val XalaAccent  = Color(0xFFF5C518)
+private val XalaText    = Color(0xFFFFFFFF)
+private val XalaMuted   = Color(0xFF8A8A8A)
+private val XalaOutline = Color(0xFF2C2C2C)
+private val XalaError   = Color(0xFFFF4444)
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -37,8 +43,6 @@ fun RegisterScreen(
     var confirmPassword by remember { mutableStateOf("") }
     var passwordVisible by remember { mutableStateOf(false) }
     var confirmPasswordVisible by remember { mutableStateOf(false) }
-
-    // Mensaje de confirmación tras registro exitoso
     var registrationDone by remember { mutableStateOf(false) }
 
     LaunchedEffect(uiState) {
@@ -47,76 +51,127 @@ fun RegisterScreen(
         }
     }
 
-    Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
-        // Cuando el registro es exitoso, mostrar confirmación
+    val fieldColors = OutlinedTextFieldDefaults.colors(
+        focusedBorderColor        = XalaAccent,
+        unfocusedBorderColor      = XalaOutline,
+        focusedLabelColor         = XalaAccent,
+        unfocusedLabelColor       = XalaMuted,
+        cursorColor               = XalaAccent,
+        focusedLeadingIconColor   = XalaAccent,
+        unfocusedLeadingIconColor = XalaMuted,
+        focusedTrailingIconColor   = XalaAccent,
+        unfocusedTrailingIconColor = XalaMuted,
+        focusedTextColor          = XalaText,
+        unfocusedTextColor        = XalaText,
+        focusedContainerColor     = XalaSurface,
+        unfocusedContainerColor   = XalaSurface,
+        errorBorderColor          = XalaError,
+        errorTextColor            = XalaText,
+        errorContainerColor       = XalaSurface,
+        errorLeadingIconColor     = XalaError,
+    )
+
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(XalaBg)
+    ) {
+
+        // ── Pantalla de éxito ───────────────────────────────────────────────
         if (registrationDone) {
             Column(
-                modifier = Modifier.fillMaxSize().padding(32.dp),
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(32.dp),
                 verticalArrangement = Arrangement.Center,
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                Text("✅", style = MaterialTheme.typography.displayMedium)
-                Spacer(Modifier.height(16.dp))
+                Box(
+                    modifier = Modifier
+                        .size(72.dp)
+                        .background(XalaAccent, shape = RoundedCornerShape(24.dp)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        Icons.Default.Check,
+                        contentDescription = null,
+                        modifier = Modifier.size(40.dp),
+                        tint = Color.Black
+                    )
+                }
+                Spacer(Modifier.height(24.dp))
                 Text(
                     text = "¡Registro exitoso!",
-                    style = MaterialTheme.typography.headlineSmall,
-                    fontWeight = FontWeight.Bold
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 26.sp,
+                    color = XalaText
                 )
                 Spacer(Modifier.height(8.dp))
                 Text(
                     text = "Revisa tu correo para confirmar tu cuenta y luego inicia sesión.",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                    color = XalaMuted,
+                    fontSize = 14.sp
                 )
-                Spacer(Modifier.height(32.dp))
+                Spacer(Modifier.height(40.dp))
                 Button(
                     onClick = {
                         registrationDone = false
                         viewModel.resetState()
                         onNavigateToLogin()
                     },
-                    modifier = Modifier.fillMaxWidth().height(50.dp)
+                    modifier = Modifier.fillMaxWidth().height(52.dp),
+                    shape = RoundedCornerShape(12.dp),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = XalaAccent,
+                        contentColor   = Color.Black
+                    )
                 ) {
-                    Text("Ir a Iniciar Sesión")
+                    Text("Ir a Iniciar Sesión", fontWeight = FontWeight.SemiBold, fontSize = 16.sp)
                 }
             }
-            return@Surface
+            return@Box
         }
 
+        // ── Formulario de registro ──────────────────────────────────────────
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(horizontal = 32.dp),
+                .padding(horizontal = 28.dp),
             verticalArrangement = Arrangement.Center,
-            horizontalAlignment = Alignment.CenterHorizontally
+            horizontalAlignment = Alignment.Start
         ) {
+
             // Botón volver
-            Row(modifier = Modifier.fillMaxWidth()) {
-                IconButton(onClick = {
+            IconButton(
+                onClick = {
                     viewModel.resetState()
                     onNavigateToLogin()
-                }) {
-                    Icon(Icons.Default.ArrowBack, contentDescription = "Regresar")
-                }
+                },
+                modifier = Modifier
+                    .background(XalaSurface, shape = RoundedCornerShape(12.dp))
+                    .size(44.dp)
+            ) {
+                Icon(Icons.Default.ArrowBack, contentDescription = "Regresar", tint = XalaText)
             }
 
-            Spacer(Modifier.height(8.dp))
+            Spacer(Modifier.height(28.dp))
 
             Text(
                 text = "Crear cuenta",
-                style = MaterialTheme.typography.headlineLarge,
-                fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.primary
+                fontWeight = FontWeight.ExtraBold,
+                fontSize = 34.sp,
+                color = XalaText
             )
+            Spacer(Modifier.height(6.dp))
             Text(
-                text = "Regístrate para usar XalaBus",
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
+                text = "Únete a XalaBus",
+                color = XalaMuted,
+                fontSize = 14.sp
             )
 
-            Spacer(Modifier.height(32.dp))
+            Spacer(Modifier.height(36.dp))
 
-            // Campo Email
+            // ── Campo Email ─────────────────────────────────────────────────
             OutlinedTextField(
                 value = email,
                 onValueChange = { email = it },
@@ -124,6 +179,8 @@ fun RegisterScreen(
                 leadingIcon = { Icon(Icons.Default.Email, contentDescription = null) },
                 singleLine = true,
                 modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(12.dp),
+                colors = fieldColors,
                 keyboardOptions = KeyboardOptions(
                     keyboardType = KeyboardType.Email,
                     imeAction = ImeAction.Next
@@ -136,7 +193,7 @@ fun RegisterScreen(
 
             Spacer(Modifier.height(12.dp))
 
-            // Campo Contraseña
+            // ── Campo Contraseña ────────────────────────────────────────────
             OutlinedTextField(
                 value = password,
                 onValueChange = { password = it },
@@ -145,7 +202,7 @@ fun RegisterScreen(
                 trailingIcon = {
                     IconButton(onClick = { passwordVisible = !passwordVisible }) {
                         Icon(
-                            imageVector = if (passwordVisible) Icons.Default.VisibilityOff else Icons.Default.Visibility,
+                            if (passwordVisible) Icons.Default.VisibilityOff else Icons.Default.Visibility,
                             contentDescription = null
                         )
                     }
@@ -153,6 +210,8 @@ fun RegisterScreen(
                 visualTransformation = if (passwordVisible) VisualTransformation.None else PasswordVisualTransformation(),
                 singleLine = true,
                 modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(12.dp),
+                colors = fieldColors,
                 keyboardOptions = KeyboardOptions(
                     keyboardType = KeyboardType.Password,
                     imeAction = ImeAction.Next
@@ -165,7 +224,7 @@ fun RegisterScreen(
 
             Spacer(Modifier.height(12.dp))
 
-            // Campo Confirmar Contraseña
+            // ── Campo Confirmar Contraseña ───────────────────────────────────
             OutlinedTextField(
                 value = confirmPassword,
                 onValueChange = { confirmPassword = it },
@@ -174,7 +233,7 @@ fun RegisterScreen(
                 trailingIcon = {
                     IconButton(onClick = { confirmPasswordVisible = !confirmPasswordVisible }) {
                         Icon(
-                            imageVector = if (confirmPasswordVisible) Icons.Default.VisibilityOff else Icons.Default.Visibility,
+                            if (confirmPasswordVisible) Icons.Default.VisibilityOff else Icons.Default.Visibility,
                             contentDescription = null
                         )
                     }
@@ -182,6 +241,8 @@ fun RegisterScreen(
                 visualTransformation = if (confirmPasswordVisible) VisualTransformation.None else PasswordVisualTransformation(),
                 singleLine = true,
                 modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(12.dp),
+                colors = fieldColors,
                 keyboardOptions = KeyboardOptions(
                     keyboardType = KeyboardType.Password,
                     imeAction = ImeAction.Done
@@ -195,45 +256,69 @@ fun RegisterScreen(
                 isError = uiState is AuthUiState.Error
             )
 
-            // Mensaje de error
             if (uiState is AuthUiState.Error) {
                 Spacer(Modifier.height(8.dp))
                 Text(
                     text = (uiState as AuthUiState.Error).message,
-                    color = MaterialTheme.colorScheme.error,
-                    style = MaterialTheme.typography.bodySmall
+                    color = XalaError,
+                    fontSize = 12.sp
                 )
             }
 
-            Spacer(Modifier.height(24.dp))
+            Spacer(Modifier.height(32.dp))
 
-            // Botón Registrarse
+            // ── Botón Crear cuenta ──────────────────────────────────────────
             Button(
                 onClick = {
                     focusManager.clearFocus()
                     viewModel.signUp(email, password, confirmPassword)
                 },
-                modifier = Modifier.fillMaxWidth().height(50.dp),
-                enabled = uiState !is AuthUiState.Loading
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(52.dp),
+                shape = RoundedCornerShape(12.dp),
+                enabled = uiState !is AuthUiState.Loading,
+                colors = ButtonDefaults.buttonColors(
+                    containerColor         = XalaAccent,
+                    contentColor           = Color.Black,
+                    disabledContainerColor = XalaAccent.copy(alpha = 0.4f),
+                    disabledContentColor   = Color.Black.copy(alpha = 0.4f)
+                )
             ) {
                 if (uiState is AuthUiState.Loading) {
                     CircularProgressIndicator(
-                        modifier = Modifier.size(24.dp),
-                        color = MaterialTheme.colorScheme.onPrimary,
+                        modifier = Modifier.size(22.dp),
+                        color = Color.Black,
                         strokeWidth = 2.dp
                     )
                 } else {
-                    Text("Registrarse", style = MaterialTheme.typography.labelLarge)
+                    Text("Crear cuenta", fontWeight = FontWeight.SemiBold, fontSize = 16.sp)
                 }
             }
 
-            Spacer(Modifier.height(16.dp))
+            Spacer(Modifier.height(20.dp))
 
-            TextButton(onClick = {
-                viewModel.resetState()
-                onNavigateToLogin()
-            }) {
-                Text("¿Ya tienes cuenta? Inicia sesión")
+            // ── Link a Login ─────────────────────────────────────────────────
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.Center,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text("¿Ya tienes cuenta? ", color = XalaMuted, fontSize = 14.sp)
+                TextButton(
+                    onClick = {
+                        viewModel.resetState()
+                        onNavigateToLogin()
+                    },
+                    contentPadding = PaddingValues(0.dp)
+                ) {
+                    Text(
+                        "Inicia sesión",
+                        color = XalaAccent,
+                        fontWeight = FontWeight.SemiBold,
+                        fontSize = 14.sp
+                    )
+                }
             }
         }
     }
