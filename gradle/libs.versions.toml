@@ -17,6 +17,8 @@ sqldelight = "2.0.2"
 spatialk = "0.3.0"
 maplibre = "11.0.0"
 mapbox-geojson = "5.8.0"
+supabase = "2.5.4"
+ktor = "2.3.12"
 
 [libraries]
 kotlin-test = { module = "org.jetbrains.kotlin:kotlin-test", version.ref = "kotlin" }
@@ -38,7 +40,6 @@ compose-ui = { module = "org.jetbrains.compose.ui:ui", version.ref = "composeMul
 compose-components-resources = { module = "org.jetbrains.compose.components:components-resources", version.ref = "composeMultiplatform" }
 compose-uiToolingPreview = { module = "org.jetbrains.compose.ui:ui-tooling-preview", version.ref = "composeMultiplatform" }
 
-
 # SQLDelight
 sqldelight-runtime = { module = "app.cash.sqldelight:runtime", version.ref = "sqldelight" }
 sqldelight-android-driver = { module = "app.cash.sqldelight:android-driver", version.ref = "sqldelight" }
@@ -48,6 +49,15 @@ sqldelight-native-driver = { module = "app.cash.sqldelight:native-driver", versi
 spatialk-geojson = { module = "io.github.dellisd.spatialk:geojson", version.ref = "spatialk" }
 maplibre-android = { module = "org.maplibre.gl:android-sdk", version.ref = "maplibre" }
 mapbox-geojson = { module = "com.mapbox.mapboxsdk:mapbox-sdk-geojson", version.ref = "mapbox-geojson" }
+
+# Supabase KT
+supabase-auth = { module = "io.github.jan-tennermann:auth-kt", version.ref = "supabase" }
+supabase-postgrest = { module = "io.github.jan-tennermann:postgrest-kt", version.ref = "supabase" }
+
+# Ktor (requerido por Supabase KT)
+ktor-client-core = { module = "io.ktor:ktor-client-core", version.ref = "ktor" }
+ktor-client-okhttp = { module = "io.ktor:ktor-client-okhttp", version.ref = "ktor" }
+ktor-client-darwin = { module = "io.ktor:ktor-client-darwin", version.ref = "ktor" }
 
 [plugins]
 androidApplication = { id = "com.android.application", version.ref = "agp" }
