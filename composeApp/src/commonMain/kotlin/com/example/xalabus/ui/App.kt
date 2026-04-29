@@ -16,18 +16,23 @@ import androidx.compose.ui.unit.dp
 import com.example.xalabus.XalaContext
 import com.example.xalabus.db.DriverFactory
 import com.example.xalabus.core.util.MapFileManager
+import com.example.xalabus.ui.auth.AuthUiState
+import com.example.xalabus.ui.auth.AuthViewModel
+import com.example.xalabus.ui.auth.LoginScreen
+import com.example.xalabus.ui.auth.RegisterScreen
 import com.example.xalabus.ui.home.HomeScreen
 import com.example.xalabus.ui.viewmodel.RouteViewModel
 import com.example.xalabus.ui.map.MapScreen
 import kotlinx.coroutines.launch
 import org.jetbrains.compose.resources.ExperimentalResourceApi
 import org.jetbrains.compose.resources.painterResource
-// Importación de recursos generados por el plugin de Compose Multiplatform
 import xalabus.composeapp.generated.resources.*
 import xalabus.composeapp.generated.resources.Res
 import androidx.compose.ui.graphics.ImageBitmap
 import org.jetbrains.compose.resources.decodeToImageBitmap
 
+/** Pantalla actual de autenticación */
+private enum class AuthScreen { LOGIN, REGISTER }
 
 @Composable
 fun LoadingScreen() {
@@ -47,7 +52,60 @@ fun App(
 ) {
     val repository = remember { XalaContext.getRepository(driverFactory) }
     val viewModel = remember { RouteViewModel(repository, fileManager) }
+    val authViewModel = remember { AuthViewModel() }
 
+    val systemDark = isSystemInDarkTheme()
+    var isDarkMode by remember { mutableStateOf(systemDark) }
+    val colorScheme = if (isDarkMode) darkColorScheme() else lightColorScheme()
+
+    // Determinar si el usuario ya tiene sesión activa
+    var isAuthenticated by remember { mutableStateOf(authViewModel.isSessionActive()) }
+    var currentAuthScreen by remember { mutableStateOf(AuthScreen.LOGIN) }
+
+    MaterialTheme(colorScheme = colorScheme) {
+        Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
+
+            if (!isAuthenticated) {
+                // ── Flujo de autenticación ──────────────────────────────────
+                when (currentAuthScreen) {
+                    AuthScreen.LOGIN -> LoginScreen(
+                        viewModel = authViewModel,
+                        onLoginSuccess = { isAuthenticated = true },
+                        onNavigateToRegister = { currentAuthScreen = AuthScreen.REGISTER }
+                    )
+                    AuthScreen.REGISTER -> RegisterScreen(
+                        viewModel = authViewModel,
+                        onRegisterSuccess = { /* El registro pide confirmación de email */ },
+                        onNavigateToLogin = { currentAuthScreen = AuthScreen.LOGIN }
+                    )
+                }
+            } else {
+                // ── App principal ───────────────────────────────────────────
+                MainAppContent(
+                    driverFactory = driverFactory,
+                    fileManager = fileManager,
+                    viewModel = viewModel,
+                    isDarkMode = isDarkMode,
+                    onToggleDarkMode = { isDarkMode = !isDarkMode },
+                    onSignOut = {
+                        authViewModel.signOut()
+                        isAuthenticated = false
+                    }
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun MainAppContent(
+    driverFactory: DriverFactory,
+    fileManager: MapFileManager,
+    viewModel: RouteViewModel,
+    isDarkMode: Boolean,
+    onToggleDarkMode: () -> Unit,
+    onSignOut: () -> Unit
+) {
     LaunchedEffect(Unit) {
         viewModel.initializeData()
     }
@@ -55,65 +113,70 @@ fun App(
     val isLoaded by viewModel.isDataLoaded.collectAsState()
     var showMap by remember { mutableStateOf(false) }
 
-    val systemDark = isSystemInDarkTheme()
-    var isDarkMode by remember { mutableStateOf(systemDark) }
-
     val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
     val scope = rememberCoroutineScope()
 
-    val colorScheme = if (isDarkMode) darkColorScheme() else lightColorScheme()
+    if (!isLoaded) {
+        LoadingScreen()
+    } else {
+        ModalNavigationDrawer(
+            drawerState = drawerState,
+            drawerContent = {
+                ModalDrawerSheet {
+                    Spacer(Modifier.height(12.dp))
+                    Text(
+                        text = "Configuraciones",
+                        modifier = Modifier.padding(16.dp),
+                        style = MaterialTheme.typography.titleLarge
+                    )
+                    HorizontalDivider()
 
-    MaterialTheme(colorScheme = colorScheme) {
-        Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
-            if (!isLoaded) {
-                LoadingScreen()
-            } else {
-                ModalNavigationDrawer(
-                    drawerState = drawerState,
-                    drawerContent = {
-                        ModalDrawerSheet {
-                            Spacer(Modifier.height(12.dp))
-                            Text(
-                                text = "Configuraciones",
-                                modifier = Modifier.padding(16.dp),
-                                style = MaterialTheme.typography.titleLarge
+                    NavigationDrawerItem(
+                        icon = { Icon(if (isDarkMode) Icons.Default.DarkMode else Icons.Default.LightMode, null) },
+                        label = { Text("Modo Oscuro") },
+                        selected = false,
+                        onClick = onToggleDarkMode,
+                        badge = {
+                            Switch(
+                                checked = isDarkMode,
+                                onCheckedChange = { onToggleDarkMode() }
                             )
-                            HorizontalDivider()
+                        },
+                        modifier = Modifier.padding(NavigationDrawerItemDefaults.ItemPadding)
+                    )
 
-                            NavigationDrawerItem(
-                                icon = { Icon(if (isDarkMode) Icons.Default.DarkMode else Icons.Default.LightMode, null) },
-                                label = { Text("Modo Oscuro") },
-                                selected = false,
-                                onClick = { isDarkMode = !isDarkMode },
-                                badge = {
-                                    Switch(
-                                        checked = isDarkMode,
-                                        onCheckedChange = { isDarkMode = it }
-                                    )
-                                },
-                                modifier = Modifier.padding(NavigationDrawerItemDefaults.ItemPadding)
-                            )
-                        }
-                    }
-                ) {
-                    if (!showMap) {
-                        HomeScreen(
-                            viewModel = viewModel,
-                            onOpenDrawer = { scope.launch { drawerState.open() } },
-                            onRouteClick = { routeId ->
-                                viewModel.selectRoute(routeId)
-                                showMap = true
-                            }
-                        )
-                    } else {
-                        MapDetailView(
-                            fileManager = fileManager,
-                            viewModel = viewModel,
-                            isDarkMode = isDarkMode,
-                            onBack = { showMap = false }
-                        )
-                    }
+                    HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
+
+                    // Botón Cerrar Sesión
+                    NavigationDrawerItem(
+                        icon = { Icon(Icons.Default.Logout, null) },
+                        label = { Text("Cerrar sesión") },
+                        selected = false,
+                        onClick = {
+                            scope.launch { drawerState.close() }
+                            onSignOut()
+                        },
+                        modifier = Modifier.padding(NavigationDrawerItemDefaults.ItemPadding)
+                    )
                 }
+            }
+        ) {
+            if (!showMap) {
+                HomeScreen(
+                    viewModel = viewModel,
+                    onOpenDrawer = { scope.launch { drawerState.open() } },
+                    onRouteClick = { routeId ->
+                        viewModel.selectRoute(routeId)
+                        showMap = true
+                    }
+                )
+            } else {
+                MapDetailView(
+                    fileManager = fileManager,
+                    viewModel = viewModel,
+                    isDarkMode = isDarkMode,
+                    onBack = { showMap = false }
+                )
             }
         }
     }
@@ -151,9 +214,6 @@ fun MapDetailView(
 
                 Spacer(Modifier.height(16.dp))
 
-                // ... dentro de MapDetailView
-
-                // Construcción de la ruta dinámica
                 val formattedId = routeId.padStart(3, '0')
                 val imagePath = "drawable/bus_$formattedId.jpg"
 
@@ -178,7 +238,6 @@ fun MapDetailView(
                     elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
                 ) {
                     Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
-                        // 3. Validamos si el Bitmap cargó exitosamente
                         if (imageBitmap != null) {
                             Image(
                                 bitmap = imageBitmap!!,
