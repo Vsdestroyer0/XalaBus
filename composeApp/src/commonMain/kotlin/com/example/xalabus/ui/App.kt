@@ -38,9 +38,12 @@ private enum class AuthScreen { LOGIN, REGISTER }
 fun LoadingScreen() {
     Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            CircularProgressIndicator()
+            CircularProgressIndicator(color = MaterialTheme.colorScheme.primary)
             Spacer(modifier = Modifier.height(16.dp))
-            Text("Cargando XalaBus...")
+            Text(
+                "Cargando XalaBus...",
+                color = MaterialTheme.colorScheme.onSurface
+            )
         }
     }
 }
@@ -56,9 +59,10 @@ fun App(
 
     val systemDark = isSystemInDarkTheme()
     var isDarkMode by remember { mutableStateOf(systemDark) }
-    val colorScheme = if (isDarkMode) darkColorScheme() else lightColorScheme()
 
-    // Determinar si el usuario ya tiene sesión activa
+    // ── Tema XalaBus: dark ámbar | light marfil ───────────────────────────────
+    val colorScheme = if (isDarkMode) XalaBusDarkColors else XalaBusLightColors
+
     var isAuthenticated by remember { mutableStateOf(authViewModel.isSessionActive()) }
     var currentAuthScreen by remember { mutableStateOf(AuthScreen.LOGIN) }
 
@@ -66,7 +70,6 @@ fun App(
         Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
 
             if (!isAuthenticated) {
-                // ── Flujo de autenticación ──────────────────────────────────
                 when (currentAuthScreen) {
                     AuthScreen.LOGIN -> LoginScreen(
                         viewModel = authViewModel,
@@ -75,12 +78,11 @@ fun App(
                     )
                     AuthScreen.REGISTER -> RegisterScreen(
                         viewModel = authViewModel,
-                        onRegisterSuccess = { /* El registro pide confirmación de email */ },
+                        onRegisterSuccess = { },
                         onNavigateToLogin = { currentAuthScreen = AuthScreen.LOGIN }
                     )
                 }
             } else {
-                // ── App principal ───────────────────────────────────────────
                 MainAppContent(
                     driverFactory = driverFactory,
                     fileManager = fileManager,
@@ -122,40 +124,59 @@ private fun MainAppContent(
         ModalNavigationDrawer(
             drawerState = drawerState,
             drawerContent = {
-                ModalDrawerSheet {
+                ModalDrawerSheet(
+                    drawerContainerColor = MaterialTheme.colorScheme.surface,
+                    drawerContentColor  = MaterialTheme.colorScheme.onSurface
+                ) {
                     Spacer(Modifier.height(12.dp))
                     Text(
                         text = "Configuraciones",
                         modifier = Modifier.padding(16.dp),
-                        style = MaterialTheme.typography.titleLarge
+                        style = MaterialTheme.typography.titleLarge,
+                        color = MaterialTheme.colorScheme.onSurface
                     )
-                    HorizontalDivider()
+                    HorizontalDivider(color = MaterialTheme.colorScheme.outline)
 
                     NavigationDrawerItem(
-                        icon = { Icon(if (isDarkMode) Icons.Default.DarkMode else Icons.Default.LightMode, null) },
+                        icon = {
+                            Icon(
+                                if (isDarkMode) Icons.Default.DarkMode else Icons.Default.LightMode,
+                                contentDescription = null
+                            )
+                        },
                         label = { Text("Modo Oscuro") },
                         selected = false,
                         onClick = onToggleDarkMode,
                         badge = {
                             Switch(
                                 checked = isDarkMode,
-                                onCheckedChange = { onToggleDarkMode() }
+                                onCheckedChange = { onToggleDarkMode() },
+                                colors = SwitchDefaults.colors(
+                                    checkedThumbColor  = Color.Black,
+                                    checkedTrackColor  = MaterialTheme.colorScheme.primary
+                                )
                             )
                         },
                         modifier = Modifier.padding(NavigationDrawerItemDefaults.ItemPadding)
                     )
 
-                    HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
+                    HorizontalDivider(
+                        modifier = Modifier.padding(vertical = 8.dp),
+                        color = MaterialTheme.colorScheme.outline
+                    )
 
-                    // Botón Cerrar Sesión
                     NavigationDrawerItem(
-                        icon = { Icon(Icons.Default.Logout, null) },
+                        icon = { Icon(Icons.Default.Logout, contentDescription = null) },
                         label = { Text("Cerrar sesión") },
                         selected = false,
                         onClick = {
                             scope.launch { drawerState.close() }
                             onSignOut()
                         },
+                        colors = NavigationDrawerItemDefaults.colors(
+                            unselectedTextColor = MaterialTheme.colorScheme.error,
+                            unselectedIconColor = MaterialTheme.colorScheme.error
+                        ),
                         modifier = Modifier.padding(NavigationDrawerItemDefaults.ItemPadding)
                     )
                 }
@@ -208,9 +229,14 @@ fun MapDetailView(
                 Text(
                     text = selectedRoute?.name ?: "Ruta Desconocida",
                     style = MaterialTheme.typography.headlineSmall,
-                    fontWeight = FontWeight.Bold
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSurface
                 )
-                Text("Xalapa, Veracruz", style = MaterialTheme.typography.bodyMedium, color = Color.Gray)
+                Text(
+                    "Xalapa, Veracruz",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
 
                 Spacer(Modifier.height(16.dp))
 
@@ -259,29 +285,55 @@ fun MapDetailView(
                     InfoItem(
                         icon = Icons.Default.Payments,
                         label = "Tarifa",
-                        value = selectedRoute?.fare?.let { if (it.isEmpty()) "N/A" else "$$it" } ?: "Consultando..."
+                        value = selectedRoute?.fare?.let {
+                            if (it.isEmpty()) "N/A" else "\$$it"
+                        } ?: "Consultando..."
                     )
                     InfoItem(
                         icon = Icons.Default.Timer,
                         label = "Frecuencia",
-                        value = selectedRoute?.frequency?.let { if (it.isEmpty()) "N/A" else it } ?: "Consultando..."
+                        value = selectedRoute?.frequency?.let {
+                            if (it.isEmpty()) "N/A" else it
+                        } ?: "Consultando..."
                     )
                 }
 
                 Spacer(Modifier.height(24.dp))
 
-                Text("Reportar cambios en la ruta", style = MaterialTheme.typography.titleMedium)
+                Text(
+                    "Reportar cambios en la ruta",
+                    style = MaterialTheme.typography.titleMedium,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
                 Spacer(Modifier.height(8.dp))
                 OutlinedTextField(
                     value = "",
                     onValueChange = {},
-                    placeholder = { Text("Escribe aquí si la ruta cambió...") },
+                    placeholder = {
+                        Text(
+                            "Escribe aquí si la ruta cambió...",
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    },
                     modifier = Modifier.fillMaxWidth(),
-                    shape = MaterialTheme.shapes.medium
+                    shape = MaterialTheme.shapes.medium,
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor   = MaterialTheme.colorScheme.primary,
+                        unfocusedBorderColor = MaterialTheme.colorScheme.outline,
+                        focusedContainerColor   = MaterialTheme.colorScheme.surfaceVariant,
+                        unfocusedContainerColor = MaterialTheme.colorScheme.surfaceVariant,
+                        focusedTextColor   = MaterialTheme.colorScheme.onSurface,
+                        unfocusedTextColor = MaterialTheme.colorScheme.onSurface,
+                        cursorColor = MaterialTheme.colorScheme.primary,
+                    )
                 )
                 Button(
                     onClick = { /* Lógica reporte */ },
-                    modifier = Modifier.align(Alignment.End).padding(top = 8.dp)
+                    modifier = Modifier.align(Alignment.End).padding(top = 8.dp),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = MaterialTheme.colorScheme.primary,
+                        contentColor   = MaterialTheme.colorScheme.onPrimary
+                    )
                 ) {
                     Icon(Icons.Default.Send, null, Modifier.size(18.dp))
                     Spacer(Modifier.width(8.dp))
@@ -300,7 +352,11 @@ fun MapDetailView(
                     containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.9f)
                 )
             ) {
-                Icon(Icons.Default.ArrowBack, contentDescription = "Regresar")
+                Icon(
+                    Icons.Default.ArrowBack,
+                    contentDescription = "Regresar",
+                    tint = MaterialTheme.colorScheme.onSurface
+                )
             }
         }
     }
@@ -309,19 +365,46 @@ fun MapDetailView(
 @Composable
 fun DefaultPlaceholder() {
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
-        Icon(Icons.Default.DirectionsBus, null, Modifier.size(48.dp), tint = Color.LightGray)
-        Text("Foto no disponible", style = MaterialTheme.typography.labelSmall, color = Color.Gray)
+        Icon(
+            Icons.Default.DirectionsBus,
+            contentDescription = null,
+            modifier = Modifier.size(48.dp),
+            tint = MaterialTheme.colorScheme.outline
+        )
+        Text(
+            "Foto no disponible",
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
     }
 }
 
 @Composable
-fun InfoItem(icon: androidx.compose.ui.graphics.vector.ImageVector, label: String, value: String) {
+fun InfoItem(
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    label: String,
+    value: String
+) {
     Row(verticalAlignment = Alignment.CenterVertically) {
-        Icon(icon, null, modifier = Modifier.size(20.dp), tint = MaterialTheme.colorScheme.primary)
+        Icon(
+            icon,
+            contentDescription = null,
+            modifier = Modifier.size(20.dp),
+            tint = MaterialTheme.colorScheme.primary
+        )
         Spacer(Modifier.width(8.dp))
         Column {
-            Text(label, style = MaterialTheme.typography.labelSmall, color = Color.Gray)
-            Text(value, style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Medium)
+            Text(
+                label,
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            Text(
+                value,
+                style = MaterialTheme.typography.bodyLarge,
+                fontWeight = FontWeight.Medium,
+                color = MaterialTheme.colorScheme.onSurface
+            )
         }
     }
 }
