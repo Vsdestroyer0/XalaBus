@@ -1,7 +1,7 @@
 [versions]
 agp = "8.7.3"
 android-compileSdk = "34"
-android-minSdk = "24"
+android-minSdk = "26"
 android-targetSdk = "34"
 androidx-activity = "1.9.3"
 androidx-appcompat = "1.7.0"
@@ -17,8 +17,8 @@ sqldelight = "2.0.2"
 spatialk = "0.3.0"
 maplibre = "11.0.0"
 mapbox-geojson = "5.8.0"
-supabase = "2.5.4"
-ktor = "2.3.12"
+supabase = "3.1.4"
+ktor = "3.1.2"
 
 [libraries]
 kotlin-test = { module = "org.jetbrains.kotlin:kotlin-test", version.ref = "kotlin" }
@@ -50,11 +50,11 @@ spatialk-geojson = { module = "io.github.dellisd.spatialk:geojson", version.ref 
 maplibre-android = { module = "org.maplibre.gl:android-sdk", version.ref = "maplibre" }
 mapbox-geojson = { module = "com.mapbox.mapboxsdk:mapbox-sdk-geojson", version.ref = "mapbox-geojson" }
 
-# Supabase KT
-supabase-auth = { module = "io.github.jan-tennermann:auth-kt", version.ref = "supabase" }
-supabase-postgrest = { module = "io.github.jan-tennermann:postgrest-kt", version.ref = "supabase" }
+# Supabase KT  —  groupId correcto: io.github.jan-tennert.supabase
+supabase-auth = { module = "io.github.jan-tennert.supabase:auth-kt", version.ref = "supabase" }
+supabase-postgrest = { module = "io.github.jan-tennert.supabase:postgrest-kt", version.ref = "supabase" }
 
-# Ktor (requerido por Supabase KT)
+# Ktor  —  versión alineada con supabase-kt 3.x
 ktor-client-core = { module = "io.ktor:ktor-client-core", version.ref = "ktor" }
 ktor-client-okhttp = { module = "io.ktor:ktor-client-okhttp", version.ref = "ktor" }
 ktor-client-darwin = { module = "io.ktor:ktor-client-darwin", version.ref = "ktor" }
