@@ -12,6 +12,9 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -27,9 +30,9 @@ fun HomeScreen(
     onOpenDrawer: () -> Unit,
     onRouteClick: (String) -> Unit
 ) {
-    // IMPORTANTE: Ahora observamos 'filteredRoutes' y 'searchQuery' del ViewModel
     val routes by viewModel.filteredRoutes.collectAsState()
     val searchText by viewModel.searchQuery.collectAsState()
+    var showFaq by remember { mutableStateOf(false) }
 
     Scaffold(
         topBar = {
@@ -50,6 +53,19 @@ fun HomeScreen(
                     }
                 }
             )
+        },
+        floatingActionButton = {
+            FloatingActionButton(
+                onClick = { showFaq = true },
+                containerColor = MaterialTheme.colorScheme.primary,
+                shape = CircleShape
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Help,
+                    contentDescription = "Preguntas Frecuentes",
+                    tint = MaterialTheme.colorScheme.onPrimary
+                )
+            }
         }
     ) { padding ->
         Column(
@@ -57,7 +73,6 @@ fun HomeScreen(
                 .fillMaxSize()
                 .padding(padding)
         ) {
-            // --- BARRA DE BÚSQUEDA ---
             OutlinedTextField(
                 value = searchText,
                 onValueChange = { viewModel.onSearchQueryChanged(it) },
@@ -69,7 +84,7 @@ fun HomeScreen(
                 ),
                 placeholder = {
                     Text(
-                        text = "Buscar ruta o colonia (Ej: 10001 o Avila Camacho)",
+                        text = "Buscar ruta o colonia (Ej: Avila Camacho)",
                         style = MaterialTheme.typography.bodyMedium.copy(
                             fontSize = 14.sp
                         )
@@ -79,7 +94,7 @@ fun HomeScreen(
                     Icon(
                         imageVector = Icons.Default.Search,
                         contentDescription = null,
-                        modifier = Modifier.size(20.dp) // Opcional: Icono un poco más pequeño
+                        modifier = Modifier.size(20.dp)
                     )
                 },
                 trailingIcon = {
@@ -100,7 +115,6 @@ fun HomeScreen(
                     unfocusedContainerColor = MaterialTheme.colorScheme.surface,
                 )
             )
-            // Texto informativo que cambia si no hay resultados
             Text(
                 text = if (routes.isEmpty() && searchText.isNotEmpty())
                     "No se encontraron rutas para '$searchText'"
@@ -122,6 +136,10 @@ fun HomeScreen(
                     )
                 }
             }
+        }
+
+        if (showFaq) {
+            FaqDialog(onDismiss = { showFaq = false })
         }
     }
 }
