@@ -4,7 +4,7 @@
     "name": "Ruta 10001",
     "desc": "Avila Camacho - Zona UV - Xalapa 2 Mil - Lomas Verdes - IPE - Bugambilias",
     "fare": "12.00",
-    "frequency": "15 min",
+    "frequency": "45 min",
     "variants": [
       {
         "direction": "unica",
@@ -1513,7 +1513,7 @@
     "id": 2,
     "name": "Buena Vista - Central de Abastos",
     "fare": "12.00",
-    "frequency": "15 min",
+    "frequency": "41 min",
     "desc": "Buena Vista - Central de Abastos",
     "variants": [
       {
@@ -2860,7 +2860,7 @@
     "name": "Ruta 10004",
     "desc": "Avenida Xalapa(economía) - 20 noviembre - Lazaro Cardenas",
     "fare": "12.00",
-    "frequency": "15 min",
+    "frequency": "37 min",
     "variants": [
       {
         "direction": "ida",
@@ -3239,7 +3239,7 @@
     "name": "Ruta 10002",
     "desc": "Campo de tiro - Hernandez Castillo - Sayago",
     "fare": "12.00",
-    "frequency": "15 min",
+    "frequency": "36 min",
     "variants": [
       {
         "direction": "unica",
@@ -3353,7 +3353,7 @@
     "name": "Ruta 10002",
     "desc": "Miradores - Banderilla",
     "fare": "12.00",
-    "frequency": "15 min",
+    "frequency": "35 min",
     "variants": [
       {
         "direction": "unica",
@@ -3595,7 +3595,7 @@
     "name": "Ruta 10002",
     "desc": "Mercado - Pipila - Jardines - Carolino Anaya",
     "fare": "12.00",
-    "frequency": "15 min",
+    "frequency": "34 min",
     "variants": [
       {
         "direction": "unica",
@@ -4001,7 +4001,7 @@
     "name": "Ruta 10003",
     "desc": "Buena Vista - Sauces- Berros - Caxa - Trancas - Pradera - Central de Abastos",
     "fare": "12.00",
-    "frequency": "15 min",
+    "frequency": "33 min",
     "variants": [
       {
         "direction": "unica",
@@ -4543,7 +4543,7 @@
     "name": "Ruta 10005",
     "desc": "Reserva territorial - 20 de noviembre - Economía - Avenida Xalapa",
     "fare": "12.00",
-    "frequency": "15 min",
+    "frequency": "33 min",
     "variants": [
       {
         "direction": "ida",
@@ -5290,7 +5290,7 @@
     "name": "Ruta 10012",
     "desc": "Sayago - Calle Nuevo León - Villa Hermosa - Sumidero",
     "fare": "12.00",
-    "frequency": "15 min",
+    "frequency": "33 min",
     "variants": [
       {
         "direction": "ida",
@@ -5985,7 +5985,7 @@
     "name": "Ruta 10014",
     "desc": "Sayago - Av Xalapa - Hernandez Castillo - Campo de tiro",
     "fare": "12.00",
-    "frequency": "15 min",
+    "frequency": "32 min",
     "variants": [
       {
         "direction": "ida",
@@ -6624,7 +6624,7 @@
     "name": "Ruta 10004",
     "desc": "Chedrahui Caram - Ejidal",
     "fare": "12.00",
-    "frequency": "15 min",
+    "frequency": "32 min",
     "variants": [
       {
         "direction": "unica",

@@ -25,10 +25,10 @@ import com.example.xalabus.ui.auth.LoginScreen
 import com.example.xalabus.ui.auth.RegisterScreen
 import com.example.xalabus.ui.home.HomeScreen
 import com.example.xalabus.ui.map.MapScreen
-import com.example.xalabus.ui.viewmodel.RouteViewModel
 import kotlinx.coroutines.launch
 import org.jetbrains.compose.resources.ExperimentalResourceApi
-import org.jetbrains.compose.resources.decodeToImageBitmap
+import org.jetbrains.compose.resources.painterResource
+import xalabus.composeapp.generated.resources.*
 import xalabus.composeapp.generated.resources.Res
 
 private enum class AppDestination { AUTH, MAIN, ADMIN_LOGIN, ADMIN_DASHBOARD }
@@ -127,8 +127,9 @@ private fun MainAppContent(
 ) {
     LaunchedEffect(Unit) { viewModel.initializeData() }
 
-    val isLoaded    by viewModel.isDataLoaded.collectAsState()
-    var showMap     by remember { mutableStateOf(false) }
+    val isLoaded by viewModel.isDataLoaded.collectAsState()
+    var showMap by remember { mutableStateOf(false) }
+
     val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
     val scope       = rememberCoroutineScope()
 
@@ -150,6 +151,32 @@ private fun MainAppContent(
                         color    = MaterialTheme.colorScheme.onSurface
                     )
                     HorizontalDivider(color = MaterialTheme.colorScheme.outline)
+    val colorScheme = if (isDarkMode) darkColorScheme() else lightColorScheme()
+
+    MaterialTheme(colorScheme = colorScheme) {
+        Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
+            if (!isLoaded) {
+                LoadingScreen()
+            } else if (showOnboarding) {
+                // Primera vez — mostrar walkthrough
+                OnboardingScreen(
+                    onFinish = {
+                        OnboardingPreferences.markOnboardingCompleted()
+                        showOnboarding = false
+                    }
+                )
+            } else {
+                ModalNavigationDrawer(
+                    drawerState = drawerState,
+                    drawerContent = {
+                        ModalDrawerSheet {
+                            Spacer(Modifier.height(12.dp))
+                            Text(
+                                text = "Configuraciones",
+                                modifier = Modifier.padding(16.dp),
+                                style = MaterialTheme.typography.titleLarge
+                            )
+                            HorizontalDivider()
 
                     NavigationDrawerItem(
                         icon   = {
@@ -252,6 +279,9 @@ fun MapDetailView(
                 )
                 Spacer(Modifier.height(16.dp))
 
+                // ... dentro de MapDetailView
+
+                // Construcción de la ruta dinámica
                 val formattedId = routeId.padStart(3, '0')
                 val imagePath   = "drawable/bus_$formattedId.jpg"
                 var imageBitmap by remember(imagePath) { mutableStateOf<ImageBitmap?>(null) }
@@ -271,6 +301,7 @@ fun MapDetailView(
                     elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
                 ) {
                     Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
+                        // 3. Validamos si el Bitmap cargó exitosamente
                         if (imageBitmap != null) {
                             Image(
                                 bitmap       = imageBitmap!!,

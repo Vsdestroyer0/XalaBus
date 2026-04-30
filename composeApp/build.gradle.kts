@@ -36,6 +36,10 @@ kotlin {
             implementation(libs.mapbox.geojson)
             // Ktor engine para Android
             implementation(libs.ktor.client.okhttp)
+
+            // Firebase
+            implementation(platform("com.google.firebase:firebase-bom:33.7.0"))
+            implementation("com.google.firebase:firebase-auth-ktx")
         }
 
         iosMain.dependencies {
@@ -108,7 +112,9 @@ dependencies {
 sqldelight {
     databases {
         create("AppDatabase") {
+            // Generamos el código en este paquete
             packageName.set("com.example.xalabus.DBD")
+            // Le decimos que busque los archivos .sq en la carpeta que ya creaste
             srcDirs.setFrom("src/commonMain/kotlin/sqldelight")
         }
     }
