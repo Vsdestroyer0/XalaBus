@@ -10,13 +10,16 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.example.xalabus.XalaContext
 import com.example.xalabus.db.DriverFactory
 import com.example.xalabus.core.util.MapFileManager
-import com.example.xalabus.ui.auth.AuthUiState
+import com.example.xalabus.ui.admin.AdminDashboardScreen
+import com.example.xalabus.ui.admin.AdminLoginScreen
+import com.example.xalabus.ui.admin.AdminViewModel
 import com.example.xalabus.ui.auth.AuthViewModel
 import com.example.xalabus.ui.auth.LoginScreen
 import com.example.xalabus.ui.auth.RegisterScreen
@@ -25,14 +28,12 @@ import com.example.xalabus.ui.viewmodel.RouteViewModel
 import com.example.xalabus.ui.map.MapScreen
 import kotlinx.coroutines.launch
 import org.jetbrains.compose.resources.ExperimentalResourceApi
-import org.jetbrains.compose.resources.painterResource
-import xalabus.composeapp.generated.resources.*
-import xalabus.composeapp.generated.resources.Res
-import androidx.compose.ui.graphics.ImageBitmap
 import org.jetbrains.compose.resources.decodeToImageBitmap
+import xalabus.composeapp.generated.resources.Res
 
-/** Pantalla actual de autenticación */
-private enum class AuthScreen { LOGIN, REGISTER }
+// ─── Destinos principales de navegación ──────────────────────────────────────
+private enum class AppDestination { AUTH, MAIN, ADMIN }
+private enum class AuthScreen     { LOGIN, REGISTER }
 
 @Composable
 fun LoadingScreen() {
@@ -40,10 +41,7 @@ fun LoadingScreen() {
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
             CircularProgressIndicator(color = MaterialTheme.colorScheme.primary)
             Spacer(modifier = Modifier.height(16.dp))
-            Text(
-                "Cargando XalaBus...",
-                color = MaterialTheme.colorScheme.onSurface
-            )
+            Text("Cargando XalaBus...", color = MaterialTheme.colorScheme.onSurface)
         }
     }
 }
@@ -53,28 +51,37 @@ fun App(
     driverFactory: DriverFactory,
     fileManager: MapFileManager
 ) {
-    val repository = remember { XalaContext.getRepository(driverFactory) }
-    val viewModel = remember { RouteViewModel(repository, fileManager) }
+    val repository    = remember { XalaContext.getRepository(driverFactory) }
+    val viewModel     = remember { RouteViewModel(repository, fileManager) }
     val authViewModel = remember { AuthViewModel() }
+    val adminViewModel = remember { AdminViewModel() }
 
     val systemDark = isSystemInDarkTheme()
     var isDarkMode by remember { mutableStateOf(systemDark) }
-
-    // ── Tema XalaBus: dark ámbar | light marfil ───────────────────────────────
     val colorScheme = if (isDarkMode) XalaBusDarkColors else XalaBusLightColors
 
-    var isAuthenticated by remember { mutableStateOf(authViewModel.isSessionActive()) }
+    // Determina el destino inicial según sesiones activas
+    var destination by remember {
+        mutableStateOf(
+            when {
+                authViewModel.isSessionActive()  -> AppDestination.MAIN
+                else                             -> AppDestination.AUTH
+            }
+        )
+    }
     var currentAuthScreen by remember { mutableStateOf(AuthScreen.LOGIN) }
 
     MaterialTheme(colorScheme = colorScheme) {
         Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
+            when (destination) {
 
-            if (!isAuthenticated) {
-                when (currentAuthScreen) {
+                // ── Autenticación de usuario normal ───────────────────────────
+                AppDestination.AUTH -> when (currentAuthScreen) {
                     AuthScreen.LOGIN -> LoginScreen(
                         viewModel = authViewModel,
-                        onLoginSuccess = { isAuthenticated = true },
-                        onNavigateToRegister = { currentAuthScreen = AuthScreen.REGISTER }
+                        onLoginSuccess = { destination = AppDestination.MAIN },
+                        onNavigateToRegister = { currentAuthScreen = AuthScreen.REGISTER },
+                        onNavigateToAdmin = { destination = AppDestination.ADMIN }
                     )
                     AuthScreen.REGISTER -> RegisterScreen(
                         viewModel = authViewModel,
@@ -82,8 +89,9 @@ fun App(
                         onNavigateToLogin = { currentAuthScreen = AuthScreen.LOGIN }
                     )
                 }
-            } else {
-                MainAppContent(
+
+                // ── App principal (usuario normal) ────────────────────────────
+                AppDestination.MAIN -> MainAppContent(
                     driverFactory = driverFactory,
                     fileManager = fileManager,
                     viewModel = viewModel,
@@ -91,11 +99,63 @@ fun App(
                     onToggleDarkMode = { isDarkMode = !isDarkMode },
                     onSignOut = {
                         authViewModel.signOut()
-                        isAuthenticated = false
+                        destination = AppDestination.AUTH
+                        currentAuthScreen = AuthScreen.LOGIN
                     }
                 )
+
+                // ── Panel de administración ───────────────────────────────────
+                AppDestination.ADMIN -> AdminLoginScreen(
+                    viewModel = adminViewModel,
+                    onLoginSuccess = { destination = AppDestination.ADMIN },
+                    onBack = { destination = AppDestination.AUTH }
+                ).also {
+                    // Reemplaza con el dashboard una vez autenticado
+                    if (adminViewModel.isAdminSessionActive()) {
+                        AdminDashboardScreen(
+                            viewModel = adminViewModel,
+                            onSignOut = {
+                                adminViewModel.signOut()
+                                destination = AppDestination.AUTH
+                            }
+                        )
+                    }
+                }
             }
         }
+    }
+}
+
+// ─── Navegación post-login admin: estado compuesto ────────────────────────────
+@Composable
+fun AdminFlow(
+    adminViewModel: AdminViewModel,
+    onExit: () -> Unit
+) {
+    var adminAuthed by remember { mutableStateOf(adminViewModel.isAdminSessionActive()) }
+    val uiState by adminViewModel.uiState.collectAsState()
+
+    LaunchedEffect(uiState) {
+        if (uiState is com.example.xalabus.ui.admin.AdminUiState.Success) {
+            adminAuthed = true
+            adminViewModel.resetState()
+        }
+    }
+
+    if (!adminAuthed) {
+        AdminLoginScreen(
+            viewModel = adminViewModel,
+            onLoginSuccess = { adminAuthed = true },
+            onBack = onExit
+        )
+    } else {
+        AdminDashboardScreen(
+            viewModel = adminViewModel,
+            onSignOut = {
+                adminViewModel.signOut()
+                onExit()
+            }
+        )
     }
 }
 
@@ -108,15 +168,12 @@ private fun MainAppContent(
     onToggleDarkMode: () -> Unit,
     onSignOut: () -> Unit
 ) {
-    LaunchedEffect(Unit) {
-        viewModel.initializeData()
-    }
+    LaunchedEffect(Unit) { viewModel.initializeData() }
 
     val isLoaded by viewModel.isDataLoaded.collectAsState()
-    var showMap by remember { mutableStateOf(false) }
-
+    var showMap  by remember { mutableStateOf(false) }
     val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
-    val scope = rememberCoroutineScope()
+    val scope       = rememberCoroutineScope()
 
     if (!isLoaded) {
         LoadingScreen()
@@ -126,11 +183,11 @@ private fun MainAppContent(
             drawerContent = {
                 ModalDrawerSheet(
                     drawerContainerColor = MaterialTheme.colorScheme.surface,
-                    drawerContentColor  = MaterialTheme.colorScheme.onSurface
+                    drawerContentColor   = MaterialTheme.colorScheme.onSurface
                 ) {
                     Spacer(Modifier.height(12.dp))
                     Text(
-                        text = "Configuraciones",
+                        "Configuraciones",
                         modifier = Modifier.padding(16.dp),
                         style = MaterialTheme.typography.titleLarge,
                         color = MaterialTheme.colorScheme.onSurface
@@ -152,8 +209,8 @@ private fun MainAppContent(
                                 checked = isDarkMode,
                                 onCheckedChange = { onToggleDarkMode() },
                                 colors = SwitchDefaults.colors(
-                                    checkedThumbColor  = Color.Black,
-                                    checkedTrackColor  = MaterialTheme.colorScheme.primary
+                                    checkedThumbColor = Color.Black,
+                                    checkedTrackColor = MaterialTheme.colorScheme.primary
                                 )
                             )
                         },
@@ -213,7 +270,6 @@ fun MapDetailView(
 ) {
     val selectedRoute by viewModel.selectedRoute.collectAsState()
     val scaffoldState = rememberBottomSheetScaffoldState()
-
     val routeId = selectedRoute?.id ?: ""
 
     BottomSheetScaffold(
@@ -227,7 +283,7 @@ fun MapDetailView(
                     .padding(horizontal = 20.dp, vertical = 10.dp)
             ) {
                 Text(
-                    text = selectedRoute?.name ?: "Ruta Desconocida",
+                    selectedRoute?.name ?: "Ruta Desconocida",
                     style = MaterialTheme.typography.headlineSmall,
                     fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.onSurface
@@ -237,12 +293,10 @@ fun MapDetailView(
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
-
                 Spacer(Modifier.height(16.dp))
 
                 val formattedId = routeId.padStart(3, '0')
-                val imagePath = "drawable/bus_$formattedId.jpg"
-
+                val imagePath   = "drawable/bus_$formattedId.jpg"
                 var imageBitmap by remember(imagePath) { mutableStateOf<ImageBitmap?>(null) }
 
                 LaunchedEffect(imagePath) {
@@ -250,9 +304,7 @@ fun MapDetailView(
                         try {
                             val bytes = Res.readBytes(imagePath)
                             imageBitmap = bytes.decodeToImageBitmap()
-                        } catch (e: Exception) {
-                            imageBitmap = null
-                        }
+                        } catch (_: Exception) { imageBitmap = null }
                     } else {
                         imageBitmap = null
                     }
@@ -283,52 +335,40 @@ fun MapDetailView(
                     horizontalArrangement = Arrangement.SpaceBetween
                 ) {
                     InfoItem(
-                        icon = Icons.Default.Payments,
+                        icon  = Icons.Default.Payments,
                         label = "Tarifa",
-                        value = selectedRoute?.fare?.let {
-                            if (it.isEmpty()) "N/A" else "\$$it"
-                        } ?: "Consultando..."
+                        value = selectedRoute?.fare?.let { if (it.isEmpty()) "N/A" else "\$$it" } ?: "Consultando..."
                     )
                     InfoItem(
-                        icon = Icons.Default.Timer,
+                        icon  = Icons.Default.Timer,
                         label = "Frecuencia",
-                        value = selectedRoute?.frequency?.let {
-                            if (it.isEmpty()) "N/A" else it
-                        } ?: "Consultando..."
+                        value = selectedRoute?.frequency?.let { if (it.isEmpty()) "N/A" else it } ?: "Consultando..."
                     )
                 }
 
                 Spacer(Modifier.height(24.dp))
-
-                Text(
-                    "Reportar cambios en la ruta",
-                    style = MaterialTheme.typography.titleMedium,
-                    color = MaterialTheme.colorScheme.onSurface
-                )
+                Text("Reportar cambios en la ruta", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onSurface)
                 Spacer(Modifier.height(8.dp))
                 OutlinedTextField(
                     value = "",
                     onValueChange = {},
                     placeholder = {
-                        Text(
-                            "Escribe aquí si la ruta cambió...",
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
+                        Text("Escribe aquí si la ruta cambió...", color = MaterialTheme.colorScheme.onSurfaceVariant)
                     },
                     modifier = Modifier.fillMaxWidth(),
                     shape = MaterialTheme.shapes.medium,
                     colors = OutlinedTextFieldDefaults.colors(
-                        focusedBorderColor   = MaterialTheme.colorScheme.primary,
-                        unfocusedBorderColor = MaterialTheme.colorScheme.outline,
+                        focusedBorderColor      = MaterialTheme.colorScheme.primary,
+                        unfocusedBorderColor    = MaterialTheme.colorScheme.outline,
                         focusedContainerColor   = MaterialTheme.colorScheme.surfaceVariant,
                         unfocusedContainerColor = MaterialTheme.colorScheme.surfaceVariant,
-                        focusedTextColor   = MaterialTheme.colorScheme.onSurface,
-                        unfocusedTextColor = MaterialTheme.colorScheme.onSurface,
-                        cursorColor = MaterialTheme.colorScheme.primary,
+                        focusedTextColor        = MaterialTheme.colorScheme.onSurface,
+                        unfocusedTextColor      = MaterialTheme.colorScheme.onSurface,
+                        cursorColor             = MaterialTheme.colorScheme.primary,
                     )
                 )
                 Button(
-                    onClick = { /* Lógica reporte */ },
+                    onClick = {},
                     modifier = Modifier.align(Alignment.End).padding(top = 8.dp),
                     colors = ButtonDefaults.buttonColors(
                         containerColor = MaterialTheme.colorScheme.primary,
@@ -352,11 +392,7 @@ fun MapDetailView(
                     containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.9f)
                 )
             ) {
-                Icon(
-                    Icons.Default.ArrowBack,
-                    contentDescription = "Regresar",
-                    tint = MaterialTheme.colorScheme.onSurface
-                )
+                Icon(Icons.Default.ArrowBack, "Regresar", tint = MaterialTheme.colorScheme.onSurface)
             }
         }
     }
@@ -365,46 +401,19 @@ fun MapDetailView(
 @Composable
 fun DefaultPlaceholder() {
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
-        Icon(
-            Icons.Default.DirectionsBus,
-            contentDescription = null,
-            modifier = Modifier.size(48.dp),
-            tint = MaterialTheme.colorScheme.outline
-        )
-        Text(
-            "Foto no disponible",
-            style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
-        )
+        Icon(Icons.Default.DirectionsBus, null, Modifier.size(48.dp), tint = MaterialTheme.colorScheme.outline)
+        Text("Foto no disponible", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
     }
 }
 
 @Composable
-fun InfoItem(
-    icon: androidx.compose.ui.graphics.vector.ImageVector,
-    label: String,
-    value: String
-) {
+fun InfoItem(icon: androidx.compose.ui.graphics.vector.ImageVector, label: String, value: String) {
     Row(verticalAlignment = Alignment.CenterVertically) {
-        Icon(
-            icon,
-            contentDescription = null,
-            modifier = Modifier.size(20.dp),
-            tint = MaterialTheme.colorScheme.primary
-        )
+        Icon(icon, null, Modifier.size(20.dp), tint = MaterialTheme.colorScheme.primary)
         Spacer(Modifier.width(8.dp))
         Column {
-            Text(
-                label,
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-            Text(
-                value,
-                style = MaterialTheme.typography.bodyLarge,
-                fontWeight = FontWeight.Medium,
-                color = MaterialTheme.colorScheme.onSurface
-            )
+            Text(label, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text(value, style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Medium, color = MaterialTheme.colorScheme.onSurface)
         }
     }
 }
