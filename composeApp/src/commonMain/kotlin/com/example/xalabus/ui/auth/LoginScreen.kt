@@ -32,7 +32,8 @@ private val XalaError   = Color(0xFFFF4444)
 fun LoginScreen(
     viewModel: AuthViewModel,
     onLoginSuccess: () -> Unit,
-    onNavigateToRegister: () -> Unit
+    onNavigateToRegister: () -> Unit,
+    onBack: () -> Unit
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val focusManager = LocalFocusManager.current
@@ -80,6 +81,20 @@ fun LoginScreen(
             verticalArrangement = Arrangement.Center,
             horizontalAlignment = Alignment.Start
         ) {
+            // ── Botón Volver ────────────────────────────────────────────────
+            IconButton(
+                onClick = {
+                    viewModel.resetState()
+                    onBack()
+                },
+                modifier = Modifier
+                    .background(XalaSurface, shape = RoundedCornerShape(12.dp))
+                    .size(44.dp)
+            ) {
+                Icon(Icons.Default.ArrowBack, contentDescription = "Regresar", tint = XalaText)
+            }
+
+            Spacer(Modifier.height(32.dp))
 
             // ── Ícono de marca ──────────────────────────────────────────────
             Box(

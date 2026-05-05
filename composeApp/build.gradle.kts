@@ -7,6 +7,7 @@ plugins {
     alias(libs.plugins.composeCompiler)
     alias(libs.plugins.sqldelight)
     alias(libs.plugins.kotlinSerialization)
+    alias(libs.plugins.secrets)
 }
 
 kotlin {
@@ -38,8 +39,8 @@ kotlin {
             implementation(libs.ktor.client.okhttp)
 
             // Firebase
-            implementation(platform("com.google.firebase:firebase-bom:33.7.0"))
-            implementation("com.google.firebase:firebase-auth-ktx")
+            implementation(platform(libs.firebase.bom.get()))
+            implementation(libs.firebase.auth.ktx)
         }
 
         iosMain.dependencies {
@@ -60,7 +61,7 @@ kotlin {
             implementation(libs.androidx.lifecycle.runtimeCompose)
 
             implementation(libs.sqldelight.runtime)
-            implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.6.2")
+            implementation(libs.kotlinx.serialization.json)
 
             // GeoJSON para commonMain
             implementation(libs.spatialk.geojson)
@@ -88,6 +89,9 @@ android {
         targetSdk = libs.versions.android.targetSdk.get().toInt()
         versionCode = 1
         versionName = "1.0"
+    }
+    buildFeatures {
+        buildConfig = true
     }
     packaging {
         resources {

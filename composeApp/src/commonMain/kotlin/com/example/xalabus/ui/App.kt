@@ -16,7 +16,6 @@ import androidx.compose.ui.unit.dp
 import com.example.xalabus.XalaContext
 import com.example.xalabus.db.DriverFactory
 import com.example.xalabus.core.util.MapFileManager
-import com.example.xalabus.ui.auth.AuthUiState
 import com.example.xalabus.ui.auth.AuthViewModel
 import com.example.xalabus.ui.auth.LoginScreen
 import com.example.xalabus.ui.auth.RegisterScreen
@@ -27,8 +26,6 @@ import com.example.xalabus.ui.onboarding.OnboardingScreen
 import com.example.xalabus.core.prefs.OnboardingPreferences
 import kotlinx.coroutines.launch
 import org.jetbrains.compose.resources.ExperimentalResourceApi
-import org.jetbrains.compose.resources.painterResource
-// Importación de recursos generados por el plugin de Compose Multiplatform
 import xalabus.composeapp.generated.resources.*
 import xalabus.composeapp.generated.resources.Res
 import androidx.compose.ui.graphics.ImageBitmap
@@ -67,21 +64,28 @@ fun App(
     val colorScheme = if (isDarkMode) XalaBusDarkColors else XalaBusLightColors
 
     var isAuthenticated by remember { mutableStateOf(authViewModel.isSessionActive()) }
+    var isAuthScreenVisible by remember { mutableStateOf(false) }
     var currentAuthScreen by remember { mutableStateOf(AuthScreen.LOGIN) }
 
     MaterialTheme(colorScheme = colorScheme) {
         Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
 
-            if (!isAuthenticated) {
+            if (isAuthScreenVisible) {
                 when (currentAuthScreen) {
                     AuthScreen.LOGIN -> LoginScreen(
                         viewModel = authViewModel,
-                        onLoginSuccess = { isAuthenticated = true },
-                        onNavigateToRegister = { currentAuthScreen = AuthScreen.REGISTER }
+                        onLoginSuccess = {
+                            isAuthenticated = true
+                            isAuthScreenVisible = false
+                        },
+                        onNavigateToRegister = { currentAuthScreen = AuthScreen.REGISTER },
+                        onBack = { isAuthScreenVisible = false }
                     )
                     AuthScreen.REGISTER -> RegisterScreen(
                         viewModel = authViewModel,
-                        onRegisterSuccess = { },
+                        onRegisterSuccess = {
+                            currentAuthScreen = AuthScreen.LOGIN
+                        },
                         onNavigateToLogin = { currentAuthScreen = AuthScreen.LOGIN }
                     )
                 }
@@ -91,7 +95,9 @@ fun App(
                     fileManager = fileManager,
                     viewModel = viewModel,
                     isDarkMode = isDarkMode,
+                    isAuthenticated = isAuthenticated,
                     onToggleDarkMode = { isDarkMode = !isDarkMode },
+                    onSignInRequest = { isAuthScreenVisible = true },
                     onSignOut = {
                         authViewModel.signOut()
                         isAuthenticated = false
@@ -108,7 +114,9 @@ private fun MainAppContent(
     fileManager: MapFileManager,
     viewModel: RouteViewModel,
     isDarkMode: Boolean,
+    isAuthenticated: Boolean,
     onToggleDarkMode: () -> Unit,
+    onSignInRequest: () -> Unit,
     onSignOut: () -> Unit
 ) {
     LaunchedEffect(Unit) {
@@ -125,13 +133,21 @@ private fun MainAppContent(
 
     if (!isLoaded) {
         LoadingScreen()
+    } else if (showOnboarding) {
+        // Primera vez — mostrar walkthrough
+        OnboardingScreen(
+            onFinish = {
+                OnboardingPreferences.markOnboardingCompleted()
+                showOnboarding = false
+            }
+        )
     } else {
         ModalNavigationDrawer(
             drawerState = drawerState,
             drawerContent = {
                 ModalDrawerSheet(
                     drawerContainerColor = MaterialTheme.colorScheme.surface,
-                    drawerContentColor  = MaterialTheme.colorScheme.onSurface
+                    drawerContentColor = MaterialTheme.colorScheme.onSurface
                 ) {
                     Spacer(Modifier.height(12.dp))
                     Text(
@@ -141,32 +157,6 @@ private fun MainAppContent(
                         color = MaterialTheme.colorScheme.onSurface
                     )
                     HorizontalDivider(color = MaterialTheme.colorScheme.outline)
-    val colorScheme = if (isDarkMode) darkColorScheme() else lightColorScheme()
-
-    MaterialTheme(colorScheme = colorScheme) {
-        Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
-            if (!isLoaded) {
-                LoadingScreen()
-            } else if (showOnboarding) {
-                // Primera vez — mostrar walkthrough
-                OnboardingScreen(
-                    onFinish = {
-                        OnboardingPreferences.markOnboardingCompleted()
-                        showOnboarding = false
-                    }
-                )
-            } else {
-                ModalNavigationDrawer(
-                    drawerState = drawerState,
-                    drawerContent = {
-                        ModalDrawerSheet {
-                            Spacer(Modifier.height(12.dp))
-                            Text(
-                                text = "Configuraciones",
-                                modifier = Modifier.padding(16.dp),
-                                style = MaterialTheme.typography.titleLarge
-                            )
-                            HorizontalDivider()
 
                     NavigationDrawerItem(
                         icon = {
@@ -183,8 +173,8 @@ private fun MainAppContent(
                                 checked = isDarkMode,
                                 onCheckedChange = { onToggleDarkMode() },
                                 colors = SwitchDefaults.colors(
-                                    checkedThumbColor  = Color.Black,
-                                    checkedTrackColor  = MaterialTheme.colorScheme.primary
+                                    checkedThumbColor = Color.Black,
+                                    checkedTrackColor = MaterialTheme.colorScheme.primary
                                 )
                             )
                         },
@@ -196,20 +186,37 @@ private fun MainAppContent(
                         color = MaterialTheme.colorScheme.outline
                     )
 
-                    NavigationDrawerItem(
-                        icon = { Icon(Icons.Default.Logout, contentDescription = null) },
-                        label = { Text("Cerrar sesión") },
-                        selected = false,
-                        onClick = {
-                            scope.launch { drawerState.close() }
-                            onSignOut()
-                        },
-                        colors = NavigationDrawerItemDefaults.colors(
-                            unselectedTextColor = MaterialTheme.colorScheme.error,
-                            unselectedIconColor = MaterialTheme.colorScheme.error
-                        ),
-                        modifier = Modifier.padding(NavigationDrawerItemDefaults.ItemPadding)
-                    )
+                    if (isAuthenticated) {
+                        NavigationDrawerItem(
+                            icon = { Icon(Icons.Default.Logout, contentDescription = null) },
+                            label = { Text("Cerrar sesión") },
+                            selected = false,
+                            onClick = {
+                                scope.launch { drawerState.close() }
+                                onSignOut()
+                            },
+                            colors = NavigationDrawerItemDefaults.colors(
+                                unselectedTextColor = MaterialTheme.colorScheme.error,
+                                unselectedIconColor = MaterialTheme.colorScheme.error
+                            ),
+                            modifier = Modifier.padding(NavigationDrawerItemDefaults.ItemPadding)
+                        )
+                    } else {
+                        NavigationDrawerItem(
+                            icon = { Icon(Icons.Default.Login, contentDescription = null) },
+                            label = { Text("Iniciar sesión") },
+                            selected = false,
+                            onClick = {
+                                scope.launch { drawerState.close() }
+                                onSignInRequest()
+                            },
+                            colors = NavigationDrawerItemDefaults.colors(
+                                unselectedTextColor = MaterialTheme.colorScheme.primary,
+                                unselectedIconColor = MaterialTheme.colorScheme.primary
+                            ),
+                            modifier = Modifier.padding(NavigationDrawerItemDefaults.ItemPadding)
+                        )
+                    }
                 }
             }
         ) {
@@ -271,8 +278,6 @@ fun MapDetailView(
 
                 Spacer(Modifier.height(16.dp))
 
-                // ... dentro de MapDetailView
-
                 // Construcción de la ruta dinámica
                 val formattedId = routeId.padStart(3, '0')
                 val imagePath = "drawable/bus_$formattedId.jpg"
@@ -298,7 +303,6 @@ fun MapDetailView(
                     elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
                 ) {
                     Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
-                        // 3. Validamos si el Bitmap cargó exitosamente
                         if (imageBitmap != null) {
                             Image(
                                 bitmap = imageBitmap!!,
@@ -353,8 +357,8 @@ fun MapDetailView(
                     modifier = Modifier.fillMaxWidth(),
                     shape = MaterialTheme.shapes.medium,
                     colors = OutlinedTextFieldDefaults.colors(
-                        focusedBorderColor   = MaterialTheme.colorScheme.primary,
-                        unfocusedBorderColor = MaterialTheme.colorScheme.outline,
+                        focusedBorderColor    = MaterialTheme.colorScheme.primary,
+                        unfocusedBorderColor  = MaterialTheme.colorScheme.outline,
                         focusedContainerColor   = MaterialTheme.colorScheme.surfaceVariant,
                         unfocusedContainerColor = MaterialTheme.colorScheme.surfaceVariant,
                         focusedTextColor   = MaterialTheme.colorScheme.onSurface,

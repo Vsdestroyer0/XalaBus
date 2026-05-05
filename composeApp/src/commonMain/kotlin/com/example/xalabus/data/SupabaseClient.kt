@@ -10,10 +10,14 @@ import io.github.jan.supabase.postgrest.Postgrest
  * ⚠️  IMPORTANTE: Reemplaza SUPABASE_URL y SUPABASE_ANON_KEY con los valores
  *     reales de tu proyecto en https://supabase.com/dashboard → Project Settings → API
  */
-object SupabaseClientProvider {
+expect object SupabaseConfig {
+    val url: String
+    val key: String
+}
 
-    private const val SUPABASE_URL = "https://TU_PROYECTO.supabase.co"
-    private const val SUPABASE_ANON_KEY = "TU_ANON_KEY_AQUI"
+object SupabaseClientProvider {
+    private val SUPABASE_URL = SupabaseConfig.url
+    private val SUPABASE_ANON_KEY = SupabaseConfig.key
 
     val client = createSupabaseClient(
         supabaseUrl = SUPABASE_URL,
