@@ -6,6 +6,8 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
+import androidx.compose.material3.darkColorScheme
+import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -37,6 +39,35 @@ import xalabus.composeapp.generated.resources.Res
 private enum class AppDestination { AUTH, MAIN, ADMIN_LOGIN, ADMIN_DASHBOARD }
 private enum class AuthScreen     { LOGIN, REGISTER }
 
+// ── Temas de Color Premium XalaBus ──────────────────────────────────────────
+private val XalaAmber = Color(0xFFF5C518)
+private val XalaDark  = Color(0xFF0A0A0A)
+private val XalaSurface = Color(0xFF161616)
+
+private val XalaBusDarkColors = darkColorScheme(
+    primary = XalaAmber,
+    onPrimary = Color.Black,
+    secondary = XalaAmber.copy(alpha = 0.8f),
+    background = XalaDark,
+    surface = XalaSurface,
+    onBackground = Color.White,
+    onSurface = Color.White,
+    outline = Color(0xFF2C2C2C),
+    surfaceVariant = Color(0xFF1E1E1E)
+)
+
+private val XalaBusLightColors = lightColorScheme(
+    primary = XalaAmber,
+    onPrimary = Color.Black,
+    secondary = XalaAmber.copy(alpha = 0.8f),
+    background = Color(0xFFF8F8F8),
+    surface = Color.White,
+    onBackground = Color.Black,
+    onSurface = Color.Black,
+    outline = Color(0xFFE0E0E0),
+    surfaceVariant = Color(0xFFF0F0F0)
+)
+
 @Composable
 fun LoadingScreen() {
     Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
@@ -62,11 +93,9 @@ fun App(
     var isDarkMode  by remember { mutableStateOf(systemDark) }
     val colorScheme = if (isDarkMode) XalaBusDarkColors else XalaBusLightColors
 
+    var isAuthenticated by remember { mutableStateOf(authViewModel.isSessionActive()) }
     var destination by remember {
-        mutableStateOf(
-            if (authViewModel.isSessionActive()) AppDestination.MAIN
-            else AppDestination.AUTH
-        )
+        mutableStateOf(AppDestination.MAIN) // Iniciamos en MAIN para que sea offline-first
     }
     var currentAuthScreen by remember { mutableStateOf(AuthScreen.LOGIN) }
 
@@ -76,9 +105,13 @@ fun App(
                 AppDestination.AUTH -> when (currentAuthScreen) {
                     AuthScreen.LOGIN -> LoginScreen(
                         viewModel            = authViewModel,
-                        onLoginSuccess       = { destination = AppDestination.MAIN },
+                        onLoginSuccess       = { 
+                            isAuthenticated = true
+                            destination = AppDestination.MAIN 
+                        },
                         onNavigateToRegister = { currentAuthScreen = AuthScreen.REGISTER },
                         onNavigateToAdmin    = { destination = AppDestination.ADMIN_LOGIN },
+                        onBack               = { destination = AppDestination.MAIN }
                     )
                     AuthScreen.REGISTER -> RegisterScreen(
                         viewModel         = authViewModel,
@@ -92,15 +125,15 @@ fun App(
                     fileManager      = fileManager,
                     viewModel        = viewModel,
                     isDarkMode       = isDarkMode,
+                    isAuthenticated  = isAuthenticated,
                     onToggleDarkMode = { isDarkMode = !isDarkMode },
-                    onSignOut        = {
-                        authViewModel.signOut()
+                    onSignInRequest  = { 
                         destination = AppDestination.AUTH
                         currentAuthScreen = AuthScreen.LOGIN
                     },
-                    onSignInRequest = {
-                        destination = AppDestination.AUTH
-                        currentAuthScreen = AuthScreen.LOGIN
+                    onSignOut        = {
+                        authViewModel.signOut()
+                        isAuthenticated = false
                     }
                 )
 
@@ -114,7 +147,7 @@ fun App(
                     viewModel  = adminViewModel,
                     onSignOut  = {
                         adminViewModel.signOut()
-                        destination = AppDestination.AUTH
+                        destination = AppDestination.MAIN
                     }
                 )
             }
@@ -128,9 +161,10 @@ private fun MainAppContent(
     fileManager: MapFileManager,
     viewModel: RouteViewModel,
     isDarkMode: Boolean,
+    isAuthenticated: Boolean,
     onToggleDarkMode: () -> Unit,
-    onSignOut: () -> Unit,
-    onSignInRequest: () -> Unit
+    onSignInRequest: () -> Unit,
+    onSignOut: () -> Unit
 ) {
     LaunchedEffect(Unit) { viewModel.initializeData() }
 
@@ -195,20 +229,37 @@ private fun MainAppContent(
                         color    = MaterialTheme.colorScheme.outline
                     )
 
-                    NavigationDrawerItem(
-                        icon   = { Icon(Icons.Default.Logout, contentDescription = null) },
-                        label  = { Text("Cerrar sesión") },
-                        selected = false,
-                        onClick  = {
-                            scope.launch { drawerState.close() }
-                            onSignOut()
-                        },
-                        colors = NavigationDrawerItemDefaults.colors(
-                            unselectedTextColor = MaterialTheme.colorScheme.error,
-                            unselectedIconColor = MaterialTheme.colorScheme.error
-                        ),
-                        modifier = Modifier.padding(NavigationDrawerItemDefaults.ItemPadding)
-                    )
+                    if (isAuthenticated) {
+                        NavigationDrawerItem(
+                            icon   = { Icon(Icons.Default.Logout, contentDescription = null) },
+                            label  = { Text("Cerrar sesión") },
+                            selected = false,
+                            onClick  = {
+                                scope.launch { drawerState.close() }
+                                onSignOut()
+                            },
+                            colors = NavigationDrawerItemDefaults.colors(
+                                unselectedTextColor = MaterialTheme.colorScheme.error,
+                                unselectedIconColor = MaterialTheme.colorScheme.error
+                            ),
+                            modifier = Modifier.padding(NavigationDrawerItemDefaults.ItemPadding)
+                        )
+                    } else {
+                        NavigationDrawerItem(
+                            icon   = { Icon(Icons.Default.Login, contentDescription = null) },
+                            label  = { Text("Iniciar sesión") },
+                            selected = false,
+                            onClick  = {
+                                scope.launch { drawerState.close() }
+                                onSignInRequest()
+                            },
+                            colors = NavigationDrawerItemDefaults.colors(
+                                unselectedTextColor = MaterialTheme.colorScheme.primary,
+                                unselectedIconColor = MaterialTheme.colorScheme.primary
+                            ),
+                            modifier = Modifier.padding(NavigationDrawerItemDefaults.ItemPadding)
+                        )
+                    }
                 }
             }
         ) {

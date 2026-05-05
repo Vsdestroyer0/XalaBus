@@ -1,17 +1,15 @@
 package com.example.xalabus.ui.onboarding
 
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.tween
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.*
+import androidx.compose.animation.core.*
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.GenericShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
@@ -21,8 +19,11 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -30,51 +31,46 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.launch
 
-// ---------------------------------------------------------------------------
-// Modelo de cada paso del walkthrough
-// ---------------------------------------------------------------------------
+// ── Colores Premium XalaBus ──────────────────────────────────────────────────
+private val XalaAmber = Color(0xFFF5C518)
+private val XalaDark  = Color(0xFF0A0A0A)
+private val XalaCard  = Color(0xFF1E1E1E)
+
+// ── Modelo de Pasos ──────────────────────────────────────────────────────────
 data class OnboardingStep(
     val icon: ImageVector,
     val title: String,
     val description: String,
-    val gradientStart: Color,
-    val gradientEnd: Color
+    val highlightLabel: String
 )
 
 val onboardingSteps = listOf(
     OnboardingStep(
         icon = Icons.Default.DirectionsBus,
         title = "Bienvenido a XalaBus",
-        description = "Tu guía de camiones urbanos en Xalapa. Consulta rutas, trayectos y tarifas de forma rápida y sencilla.",
-        gradientStart = Color(0xFF1565C0),
-        gradientEnd = Color(0xFF42A5F5)
+        description = "La forma más inteligente de moverte por Xalapa. Todo el transporte en la palma de tu mano.",
+        highlightLabel = "TU GUÍA"
     ),
     OnboardingStep(
         icon = Icons.Default.Search,
-        title = "Busca tu ruta",
-        description = "Usa la barra de búsqueda para encontrar rutas por nombre o colonia.\n\nEjemplo: \"Avila Camacho\" o \"Centro\".",
-        gradientStart = Color(0xFF00695C),
-        gradientEnd = Color(0xFF26A69A)
+        title = "Encuentra tu ruta",
+        description = "Escribe el nombre de tu colonia o una calle y te diremos qué camión te lleva.",
+        highlightLabel = "BUSCADOR"
     ),
     OnboardingStep(
         icon = Icons.Default.Map,
-        title = "Explora el mapa",
-        description = "Selecciona cualquier ruta de la lista para ver su trayecto completo sobre el mapa de Xalapa.",
-        gradientStart = Color(0xFF6A1B9A),
-        gradientEnd = Color(0xFFAB47BC)
+        title = "Sigue el trayecto",
+        description = "Toca cualquier ruta para ver el trazado exacto sobre el mapa en tiempo real.",
+        highlightLabel = "EL MAPA"
     ),
     OnboardingStep(
         icon = Icons.Default.Help,
-        title = "¿Tienes dudas?",
-        description = "Toca el botón ❓ en la pantalla principal para consultar las preguntas frecuentes sobre la app.",
-        gradientStart = Color(0xFFE65100),
-        gradientEnd = Color(0xFFFFA726)
+        title = "Resuelve tus dudas",
+        description = "¿No sabes cuánto cuesta o cada cuánto pasa? Toca el signo de interrogación.",
+        highlightLabel = "AYUDA"
     )
 )
 
-// ---------------------------------------------------------------------------
-// Pantalla principal del walkthrough
-// ---------------------------------------------------------------------------
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun OnboardingScreen(
@@ -84,200 +80,243 @@ fun OnboardingScreen(
     val scope = rememberCoroutineScope()
     val isLastPage = pagerState.currentPage == onboardingSteps.lastIndex
 
-    val currentStep = onboardingSteps[pagerState.currentPage]
-
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(
-                Brush.verticalGradient(
-                    colors = listOf(currentStep.gradientStart, currentStep.gradientEnd)
-                )
-            )
+            .background(XalaDark)
     ) {
-        // Botón "Saltar" — esquina superior derecha (oculto en última página)
-        AnimatedVisibility(
-            visible = !isLastPage,
-            modifier = Modifier
-                .align(Alignment.TopEnd)
-                .padding(top = 52.dp, end = 20.dp),
-            enter = fadeIn(),
-            exit = fadeOut()
-        ) {
-            TextButton(onClick = onFinish) {
-                Text(
-                    text = "Saltar",
-                    color = Color.White.copy(alpha = 0.8f),
-                    fontWeight = FontWeight.Medium,
-                    fontSize = 15.sp
-                )
-            }
-        }
+        // ── Fondo de Luces (Ambient Light) ───────────────────────────────────
+        AmbientGlow(pagerState.currentPage)
 
-        // Contenido central — pager
         Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(horizontal = 24.dp),
+            modifier = Modifier.fillMaxSize(),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            Spacer(modifier = Modifier.weight(0.08f))
-
-            HorizontalPager(
-                state = pagerState,
-                modifier = Modifier.weight(1f)
-            ) { page ->
-                OnboardingPage(step = onboardingSteps[page])
-            }
-
-            Spacer(modifier = Modifier.height(24.dp))
-
-            // Indicadores de punto
-            PageIndicatorRow(
-                pageCount = onboardingSteps.size,
-                currentPage = pagerState.currentPage
-            )
-
-            Spacer(modifier = Modifier.height(32.dp))
-
-            // Botón principal
-            Button(
-                onClick = {
-                    if (isLastPage) {
-                        onFinish()
-                    } else {
-                        scope.launch {
-                            pagerState.animateScrollToPage(pagerState.currentPage + 1)
-                        }
-                    }
-                },
+            // Cabecera con botón Saltar
+            Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(54.dp),
-                shape = RoundedCornerShape(16.dp),
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = Color.White,
-                    contentColor = currentStep.gradientStart
-                ),
-                elevation = ButtonDefaults.buttonElevation(defaultElevation = 4.dp)
+                    .padding(top = 48.dp, end = 20.dp, start = 20.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
-                    text = if (isLastPage) "¡Comenzar!" else "Siguiente",
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 16.sp
+                    text = "XalaBus",
+                    color = XalaAmber,
+                    fontWeight = FontWeight.ExtraBold,
+                    letterSpacing = 2.sp
                 )
+
                 if (!isLastPage) {
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Icon(
-                        imageVector = Icons.Default.ArrowForward,
-                        contentDescription = null,
-                        modifier = Modifier.size(18.dp)
-                    )
+                    TextButton(onClick = onFinish) {
+                        Text("Saltar", color = Color.White.copy(alpha = 0.5f))
+                    }
                 }
             }
 
-            Spacer(modifier = Modifier.height(40.dp))
+            // Pager de contenido
+            HorizontalPager(
+                state = pagerState,
+                modifier = Modifier.weight(1f),
+                userScrollEnabled = true
+            ) { page ->
+                OnboardingPageContent(onboardingSteps[page])
+            }
+
+            // Footer con indicadores y botón
+            OnboardingFooter(
+                pagerState = pagerState,
+                onNext = {
+                    if (isLastPage) onFinish()
+                    else scope.launch { pagerState.animateScrollToPage(pagerState.currentPage + 1) }
+                }
+            )
         }
     }
 }
 
-// ---------------------------------------------------------------------------
-// Página individual del walkthrough
-// ---------------------------------------------------------------------------
 @Composable
-fun OnboardingPage(step: OnboardingStep) {
-    var visible by remember { mutableStateOf(false) }
-    val scale by animateFloatAsState(
-        targetValue = if (visible) 1f else 0.6f,
-        animationSpec = tween(durationMillis = 400),
-        label = "iconScale"
+private fun OnboardingPageContent(step: OnboardingStep) {
+    val infiniteTransition = rememberInfiniteTransition(label = "pulse")
+    val pulseScale by infiniteTransition.animateFloat(
+        initialValue = 1f,
+        targetValue = 1.15f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(2000, easing = FastOutSlowInEasing),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "pulseScale"
     )
-
-    LaunchedEffect(step) {
-        visible = false
-        visible = true
-    }
 
     Column(
         modifier = Modifier.fillMaxSize(),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center
     ) {
-        // Ícono en círculo blanco semitransparente
-        Box(
-            modifier = Modifier
-                .size(140.dp)
-                .scale(scale)
-                .clip(CircleShape)
-                .background(Color.White.copy(alpha = 0.2f)),
-            contentAlignment = Alignment.Center
-        ) {
-            Icon(
-                imageVector = step.icon,
-                contentDescription = null,
-                modifier = Modifier.size(72.dp),
-                tint = Color.White
-            )
+        // ── Spotlight (El Foco) ─────────────────────────────────────────────
+        Box(contentAlignment = Alignment.Center) {
+            // Glow radial
+            Canvas(modifier = Modifier.size(240.dp)) {
+                drawCircle(
+                    brush = Brush.radialGradient(
+                        colors = listOf(XalaAmber.copy(alpha = 0.15f), Color.Transparent),
+                        center = center,
+                        radius = size.width / 2
+                    )
+                )
+            }
+
+            // Círculo central con icono
+            Surface(
+                modifier = Modifier
+                    .size(120.dp)
+                    .scale(pulseScale),
+                shape = CircleShape,
+                color = XalaAmber,
+                shadowElevation = 20.dp
+            ) {
+                Icon(
+                    imageVector = step.icon,
+                    contentDescription = null,
+                    modifier = Modifier.padding(32.dp),
+                    tint = Color.Black
+                )
+            }
+
+            // Etiqueta flotante (Highlight)
+            Box(
+                modifier = Modifier
+                    .offset(y = (-70).dp, x = 50.dp)
+                    .background(Color.White, RoundedCornerShape(8.dp))
+                    .padding(horizontal = 8.dp, vertical = 4.dp)
+            ) {
+                Text(
+                    text = step.highlightLabel,
+                    fontSize = 10.sp,
+                    fontWeight = FontWeight.Black,
+                    color = Color.Black
+                )
+            }
         }
 
-        Spacer(modifier = Modifier.height(40.dp))
+        Spacer(modifier = Modifier.height(60.dp))
 
-        AnimatedVisibility(
-            visible = visible,
-            enter = fadeIn(tween(500)) + slideInVertically(tween(500)) { it / 3 }
+        // ── Tooltip Style Card ──────────────────────────────────────────────
+        TooltipCard(step.title, step.description)
+    }
+}
+
+@Composable
+private fun TooltipCard(title: String, description: String) {
+    Column(
+        modifier = Modifier
+            .padding(horizontal = 32.dp)
+            .fillMaxWidth(),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        // Triángulo del Tooltip
+        Canvas(modifier = Modifier.size(20.dp, 10.dp)) {
+            val path = Path().apply {
+                moveTo(size.width / 2, 0f)
+                lineTo(0f, size.height)
+                lineTo(size.width, size.height)
+                close()
+            }
+            drawPath(path, XalaCard)
+        }
+
+        // Cuerpo del Tooltip
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .background(XalaCard, RoundedCornerShape(20.dp))
+                .padding(24.dp)
         ) {
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
                 Text(
-                    text = step.title,
-                    style = MaterialTheme.typography.headlineMedium.copy(
-                        fontWeight = FontWeight.ExtraBold,
-                        color = Color.White
-                    ),
+                    text = title,
+                    style = MaterialTheme.typography.headlineSmall,
+                    fontWeight = FontWeight.Bold,
+                    color = Color.White,
                     textAlign = TextAlign.Center
                 )
-
-                Spacer(modifier = Modifier.height(20.dp))
-
+                Spacer(modifier = Modifier.height(12.dp))
                 Text(
-                    text = step.description,
-                    style = MaterialTheme.typography.bodyLarge.copy(
-                        color = Color.White.copy(alpha = 0.9f),
-                        lineHeight = 26.sp
-                    ),
+                    text = description,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = Color.White.copy(alpha = 0.7f),
                     textAlign = TextAlign.Center,
-                    modifier = Modifier.padding(horizontal = 8.dp)
+                    lineHeight = 22.sp
                 )
             }
         }
     }
 }
 
-// ---------------------------------------------------------------------------
-// Indicadores de página (puntos)
-// ---------------------------------------------------------------------------
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
-fun PageIndicatorRow(pageCount: Int, currentPage: Int) {
-    Row(
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
-        verticalAlignment = Alignment.CenterVertically
+private fun OnboardingFooter(
+    pagerState: androidx.compose.foundation.pager.PagerState,
+    onNext: () -> Unit
+) {
+    val isLastPage = pagerState.currentPage == onboardingSteps.lastIndex
+
+    Column(
+        modifier = Modifier
+            .padding(32.dp)
+            .fillMaxWidth(),
+        horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        repeat(pageCount) { index ->
-            val isSelected = index == currentPage
-            val width by animateFloatAsState(
-                targetValue = if (isSelected) 28f else 8f,
-                animationSpec = tween(300),
-                label = "indicatorWidth"
+        // Indicadores
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            repeat(onboardingSteps.size) { index ->
+                val active = index == pagerState.currentPage
+                Box(
+                    modifier = Modifier
+                        .size(height = 6.dp, width = if (active) 24.dp else 6.dp)
+                        .clip(CircleShape)
+                        .background(if (active) XalaAmber else Color.White.copy(alpha = 0.2f))
+                )
+            }
+        }
+
+        Spacer(modifier = Modifier.height(32.dp))
+
+        // Botón principal
+        Button(
+            onClick = onNext,
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(56.dp),
+            shape = RoundedCornerShape(16.dp),
+            colors = ButtonDefaults.buttonColors(
+                containerColor = if (isLastPage) XalaAmber else Color.White,
+                contentColor = Color.Black
             )
-            Box(
-                modifier = Modifier
-                    .height(8.dp)
-                    .width(width.dp)
-                    .clip(CircleShape)
-                    .background(
-                        if (isSelected) Color.White
-                        else Color.White.copy(alpha = 0.4f)
-                    )
+        ) {
+            Text(
+                text = if (isLastPage) "¡EMPEZAR AHORA!" else "SIGUIENTE",
+                fontWeight = FontWeight.ExtraBold,
+                letterSpacing = 1.sp
             )
         }
+    }
+}
+
+@Composable
+private fun AmbientGlow(currentPage: Int) {
+    val offset by animateFloatAsState(
+        targetValue = currentPage * 200f,
+        animationSpec = tween(1000)
+    )
+
+    Canvas(modifier = Modifier.fillMaxSize()) {
+        drawCircle(
+            brush = Brush.radialGradient(
+                colors = listOf(XalaAmber.copy(alpha = 0.05f), Color.Transparent),
+                radius = 800f
+            ),
+            center = center.copy(x = center.x + (offset - 300f))
+        )
     }
 }
