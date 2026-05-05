@@ -24,15 +24,14 @@ import com.example.xalabus.ui.auth.AuthViewModel
 import com.example.xalabus.ui.auth.LoginScreen
 import com.example.xalabus.ui.auth.RegisterScreen
 import com.example.xalabus.ui.home.HomeScreen
-import com.example.xalabus.ui.viewmodel.RouteViewModel
 import com.example.xalabus.ui.map.MapScreen
+import com.example.xalabus.ui.viewmodel.RouteViewModel
 import kotlinx.coroutines.launch
 import org.jetbrains.compose.resources.ExperimentalResourceApi
 import org.jetbrains.compose.resources.decodeToImageBitmap
 import xalabus.composeapp.generated.resources.Res
 
-// ─── Destinos principales de navegación ──────────────────────────────────────
-private enum class AppDestination { AUTH, MAIN, ADMIN }
+private enum class AppDestination { AUTH, MAIN, ADMIN_LOGIN, ADMIN_DASHBOARD }
 private enum class AuthScreen     { LOGIN, REGISTER }
 
 @Composable
@@ -40,7 +39,7 @@ fun LoadingScreen() {
     Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
             CircularProgressIndicator(color = MaterialTheme.colorScheme.primary)
-            Spacer(modifier = Modifier.height(16.dp))
+            Spacer(Modifier.height(16.dp))
             Text("Cargando XalaBus...", color = MaterialTheme.colorScheme.onSurface)
         }
     }
@@ -51,22 +50,19 @@ fun App(
     driverFactory: DriverFactory,
     fileManager: MapFileManager
 ) {
-    val repository    = remember { XalaContext.getRepository(driverFactory) }
-    val viewModel     = remember { RouteViewModel(repository, fileManager) }
-    val authViewModel = remember { AuthViewModel() }
+    val repository     = remember { XalaContext.getRepository(driverFactory) }
+    val viewModel      = remember { RouteViewModel(repository, fileManager) }
+    val authViewModel  = remember { AuthViewModel() }
     val adminViewModel = remember { AdminViewModel() }
 
-    val systemDark = isSystemInDarkTheme()
-    var isDarkMode by remember { mutableStateOf(systemDark) }
+    val systemDark  = isSystemInDarkTheme()
+    var isDarkMode  by remember { mutableStateOf(systemDark) }
     val colorScheme = if (isDarkMode) XalaBusDarkColors else XalaBusLightColors
 
-    // Determina el destino inicial según sesiones activas
     var destination by remember {
         mutableStateOf(
-            when {
-                authViewModel.isSessionActive()  -> AppDestination.MAIN
-                else                             -> AppDestination.AUTH
-            }
+            if (authViewModel.isSessionActive()) AppDestination.MAIN
+            else AppDestination.AUTH
         )
     }
     var currentAuthScreen by remember { mutableStateOf(AuthScreen.LOGIN) }
@@ -75,87 +71,48 @@ fun App(
         Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
             when (destination) {
 
-                // ── Autenticación de usuario normal ───────────────────────────
                 AppDestination.AUTH -> when (currentAuthScreen) {
                     AuthScreen.LOGIN -> LoginScreen(
-                        viewModel = authViewModel,
-                        onLoginSuccess = { destination = AppDestination.MAIN },
+                        viewModel            = authViewModel,
+                        onLoginSuccess       = { destination = AppDestination.MAIN },
                         onNavigateToRegister = { currentAuthScreen = AuthScreen.REGISTER },
-                        onNavigateToAdmin = { destination = AppDestination.ADMIN }
+                        onNavigateToAdmin    = { destination = AppDestination.ADMIN_LOGIN }
                     )
                     AuthScreen.REGISTER -> RegisterScreen(
-                        viewModel = authViewModel,
+                        viewModel         = authViewModel,
                         onRegisterSuccess = { },
                         onNavigateToLogin = { currentAuthScreen = AuthScreen.LOGIN }
                     )
                 }
 
-                // ── App principal (usuario normal) ────────────────────────────
                 AppDestination.MAIN -> MainAppContent(
-                    driverFactory = driverFactory,
-                    fileManager = fileManager,
-                    viewModel = viewModel,
-                    isDarkMode = isDarkMode,
+                    driverFactory    = driverFactory,
+                    fileManager      = fileManager,
+                    viewModel        = viewModel,
+                    isDarkMode       = isDarkMode,
                     onToggleDarkMode = { isDarkMode = !isDarkMode },
-                    onSignOut = {
+                    onSignOut        = {
                         authViewModel.signOut()
                         destination = AppDestination.AUTH
                         currentAuthScreen = AuthScreen.LOGIN
                     }
                 )
 
-                // ── Panel de administración ───────────────────────────────────
-                AppDestination.ADMIN -> AdminLoginScreen(
-                    viewModel = adminViewModel,
-                    onLoginSuccess = { destination = AppDestination.ADMIN },
-                    onBack = { destination = AppDestination.AUTH }
-                ).also {
-                    // Reemplaza con el dashboard una vez autenticado
-                    if (adminViewModel.isAdminSessionActive()) {
-                        AdminDashboardScreen(
-                            viewModel = adminViewModel,
-                            onSignOut = {
-                                adminViewModel.signOut()
-                                destination = AppDestination.AUTH
-                            }
-                        )
+                AppDestination.ADMIN_LOGIN -> AdminLoginScreen(
+                    viewModel      = adminViewModel,
+                    onLoginSuccess = { destination = AppDestination.ADMIN_DASHBOARD },
+                    onBack         = { destination = AppDestination.AUTH }
+                )
+
+                AppDestination.ADMIN_DASHBOARD -> AdminDashboardScreen(
+                    viewModel  = adminViewModel,
+                    onSignOut  = {
+                        adminViewModel.signOut()
+                        destination = AppDestination.AUTH
                     }
-                }
+                )
             }
         }
-    }
-}
-
-// ─── Navegación post-login admin: estado compuesto ────────────────────────────
-@Composable
-fun AdminFlow(
-    adminViewModel: AdminViewModel,
-    onExit: () -> Unit
-) {
-    var adminAuthed by remember { mutableStateOf(adminViewModel.isAdminSessionActive()) }
-    val uiState by adminViewModel.uiState.collectAsState()
-
-    LaunchedEffect(uiState) {
-        if (uiState is com.example.xalabus.ui.admin.AdminUiState.Success) {
-            adminAuthed = true
-            adminViewModel.resetState()
-        }
-    }
-
-    if (!adminAuthed) {
-        AdminLoginScreen(
-            viewModel = adminViewModel,
-            onLoginSuccess = { adminAuthed = true },
-            onBack = onExit
-        )
-    } else {
-        AdminDashboardScreen(
-            viewModel = adminViewModel,
-            onSignOut = {
-                adminViewModel.signOut()
-                onExit()
-            }
-        )
     }
 }
 
@@ -170,8 +127,8 @@ private fun MainAppContent(
 ) {
     LaunchedEffect(Unit) { viewModel.initializeData() }
 
-    val isLoaded by viewModel.isDataLoaded.collectAsState()
-    var showMap  by remember { mutableStateOf(false) }
+    val isLoaded    by viewModel.isDataLoaded.collectAsState()
+    var showMap     by remember { mutableStateOf(false) }
     val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
     val scope       = rememberCoroutineScope()
 
@@ -189,22 +146,22 @@ private fun MainAppContent(
                     Text(
                         "Configuraciones",
                         modifier = Modifier.padding(16.dp),
-                        style = MaterialTheme.typography.titleLarge,
-                        color = MaterialTheme.colorScheme.onSurface
+                        style    = MaterialTheme.typography.titleLarge,
+                        color    = MaterialTheme.colorScheme.onSurface
                     )
                     HorizontalDivider(color = MaterialTheme.colorScheme.outline)
 
                     NavigationDrawerItem(
-                        icon = {
+                        icon   = {
                             Icon(
                                 if (isDarkMode) Icons.Default.DarkMode else Icons.Default.LightMode,
                                 contentDescription = null
                             )
                         },
-                        label = { Text("Modo Oscuro") },
+                        label  = { Text("Modo Oscuro") },
                         selected = false,
-                        onClick = onToggleDarkMode,
-                        badge = {
+                        onClick  = onToggleDarkMode,
+                        badge  = {
                             Switch(
                                 checked = isDarkMode,
                                 onCheckedChange = { onToggleDarkMode() },
@@ -219,14 +176,14 @@ private fun MainAppContent(
 
                     HorizontalDivider(
                         modifier = Modifier.padding(vertical = 8.dp),
-                        color = MaterialTheme.colorScheme.outline
+                        color    = MaterialTheme.colorScheme.outline
                     )
 
                     NavigationDrawerItem(
-                        icon = { Icon(Icons.Default.Logout, contentDescription = null) },
-                        label = { Text("Cerrar sesión") },
+                        icon   = { Icon(Icons.Default.Logout, contentDescription = null) },
+                        label  = { Text("Cerrar sesión") },
                         selected = false,
-                        onClick = {
+                        onClick  = {
                             scope.launch { drawerState.close() }
                             onSignOut()
                         },
@@ -241,7 +198,7 @@ private fun MainAppContent(
         ) {
             if (!showMap) {
                 HomeScreen(
-                    viewModel = viewModel,
+                    viewModel    = viewModel,
                     onOpenDrawer = { scope.launch { drawerState.open() } },
                     onRouteClick = { routeId ->
                         viewModel.selectRoute(routeId)
@@ -251,9 +208,9 @@ private fun MainAppContent(
             } else {
                 MapDetailView(
                     fileManager = fileManager,
-                    viewModel = viewModel,
-                    isDarkMode = isDarkMode,
-                    onBack = { showMap = false }
+                    viewModel   = viewModel,
+                    isDarkMode  = isDarkMode,
+                    onBack      = { showMap = false }
                 )
             }
         }
@@ -268,13 +225,13 @@ fun MapDetailView(
     isDarkMode: Boolean,
     onBack: () -> Unit
 ) {
-    val selectedRoute by viewModel.selectedRoute.collectAsState()
+    val selectedRoute  by viewModel.selectedRoute.collectAsState()
     val scaffoldState = rememberBottomSheetScaffoldState()
-    val routeId = selectedRoute?.id ?: ""
+    val routeId       = selectedRoute?.id ?: ""
 
     BottomSheetScaffold(
-        scaffoldState = scaffoldState,
-        sheetPeekHeight = 200.dp,
+        scaffoldState       = scaffoldState,
+        sheetPeekHeight     = 200.dp,
         sheetContainerColor = MaterialTheme.colorScheme.surface,
         sheetContent = {
             Column(
@@ -284,9 +241,9 @@ fun MapDetailView(
             ) {
                 Text(
                     selectedRoute?.name ?: "Ruta Desconocida",
-                    style = MaterialTheme.typography.headlineSmall,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onSurface
+                    style       = MaterialTheme.typography.headlineSmall,
+                    fontWeight  = FontWeight.Bold,
+                    color       = MaterialTheme.colorScheme.onSurface
                 )
                 Text(
                     "Xalapa, Veracruz",
@@ -305,27 +262,23 @@ fun MapDetailView(
                             val bytes = Res.readBytes(imagePath)
                             imageBitmap = bytes.decodeToImageBitmap()
                         } catch (_: Exception) { imageBitmap = null }
-                    } else {
-                        imageBitmap = null
-                    }
+                    } else { imageBitmap = null }
                 }
 
                 Card(
-                    modifier = Modifier.fillMaxWidth().height(160.dp),
-                    shape = MaterialTheme.shapes.large,
+                    modifier  = Modifier.fillMaxWidth().height(160.dp),
+                    shape     = MaterialTheme.shapes.large,
                     elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
                 ) {
                     Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
                         if (imageBitmap != null) {
                             Image(
-                                bitmap = imageBitmap!!,
+                                bitmap       = imageBitmap!!,
                                 contentDescription = "Foto del autobús $formattedId",
-                                modifier = Modifier.fillMaxSize(),
+                                modifier     = Modifier.fillMaxSize(),
                                 contentScale = ContentScale.Crop
                             )
-                        } else {
-                            DefaultPlaceholder()
-                        }
+                        } else { DefaultPlaceholder() }
                     }
                 }
 
@@ -350,11 +303,8 @@ fun MapDetailView(
                 Text("Reportar cambios en la ruta", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onSurface)
                 Spacer(Modifier.height(8.dp))
                 OutlinedTextField(
-                    value = "",
-                    onValueChange = {},
-                    placeholder = {
-                        Text("Escribe aquí si la ruta cambió...", color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    },
+                    value = "", onValueChange = {},
+                    placeholder = { Text("Escribe aquí si la ruta cambió...", color = MaterialTheme.colorScheme.onSurfaceVariant) },
                     modifier = Modifier.fillMaxWidth(),
                     shape = MaterialTheme.shapes.medium,
                     colors = OutlinedTextFieldDefaults.colors(
@@ -370,7 +320,7 @@ fun MapDetailView(
                 Button(
                     onClick = {},
                     modifier = Modifier.align(Alignment.End).padding(top = 8.dp),
-                    colors = ButtonDefaults.buttonColors(
+                    colors   = ButtonDefaults.buttonColors(
                         containerColor = MaterialTheme.colorScheme.primary,
                         contentColor   = MaterialTheme.colorScheme.onPrimary
                     )
@@ -386,9 +336,9 @@ fun MapDetailView(
         Box(modifier = Modifier.padding(innerPadding).fillMaxSize()) {
             MapScreen(fileManager = fileManager, viewModel = viewModel, isDarkMode = isDarkMode)
             FilledIconButton(
-                onClick = onBack,
+                onClick  = onBack,
                 modifier = Modifier.padding(16.dp).size(48.dp).align(Alignment.TopStart),
-                colors = IconButtonDefaults.filledIconButtonColors(
+                colors   = IconButtonDefaults.filledIconButtonColors(
                     containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.9f)
                 )
             ) {

@@ -27,21 +27,20 @@ import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
-// Paleta oscura (misma que en el diseño anterior)
-private val XalaBg       = Color(0xFF0A0A0A)
-private val XalaSurface  = Color(0xFF161616)
-private val XalaAccent   = Color(0xFFF5C518)
-private val XalaText     = Color(0xFFFFFFFF)
-private val XalaMuted    = Color(0xFF8A8A8A)
-private val XalaOutline  = Color(0xFF2C2C2C)
-private val XalaError    = Color(0xFFFF4444)
+private val XalaBg      = Color(0xFF0A0A0A)
+private val XalaSurface = Color(0xFF161616)
+private val XalaAccent  = Color(0xFFF5C518)
+private val XalaText    = Color(0xFFFFFFFF)
+private val XalaMuted   = Color(0xFF8A8A8A)
+private val XalaOutline = Color(0xFF2C2C2C)
+private val XalaError   = Color(0xFFFF4444)
 
 @Composable
 fun LoginScreen(
     viewModel: AuthViewModel,
     onLoginSuccess: () -> Unit,
     onNavigateToRegister: () -> Unit,
-    onNavigateToAdmin: () -> Unit   // ← nuevo callback
+    onNavigateToAdmin: () -> Unit
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val focusManager = LocalFocusManager.current
@@ -76,7 +75,7 @@ fun LoginScreen(
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.spacedBy(20.dp)
             ) {
-                // Ícono bus
+                // Ícono bus ámbar
                 Box(
                     modifier = Modifier
                         .size(80.dp)
@@ -92,6 +91,7 @@ fun LoginScreen(
                     )
                 }
 
+                // Título
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
                     Text("Bienvenido a", color = XalaMuted, fontSize = 14.sp, letterSpacing = 2.sp)
                     Text("XalaBus", color = XalaText, fontSize = 30.sp, fontWeight = FontWeight.Bold)
@@ -99,34 +99,45 @@ fun LoginScreen(
 
                 Spacer(Modifier.height(4.dp))
 
-                // Campo email
+                // Email
                 OutlinedTextField(
                     value = email,
                     onValueChange = { email = it },
                     label = { Text("Correo electrónico", color = XalaMuted, fontSize = 13.sp) },
-                    leadingIcon = { Icon(Icons.Default.Email, null, tint = XalaAccent.copy(0.7f), modifier = Modifier.size(20.dp)) },
+                    leadingIcon = {
+                        Icon(Icons.Default.Email, null, tint = XalaAccent.copy(0.7f), modifier = Modifier.size(20.dp))
+                    },
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email, imeAction = ImeAction.Next),
                     keyboardActions = KeyboardActions(onNext = { focusManager.moveFocus(FocusDirection.Down) }),
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(14.dp),
                     colors = OutlinedTextFieldDefaults.colors(
-                        focusedBorderColor = XalaAccent, unfocusedBorderColor = XalaOutline,
-                        focusedContainerColor = XalaSurface, unfocusedContainerColor = XalaSurface,
-                        focusedTextColor = XalaText, unfocusedTextColor = XalaText,
-                        cursorColor = XalaAccent, focusedLabelColor = XalaAccent
+                        focusedBorderColor      = XalaAccent,
+                        unfocusedBorderColor    = XalaOutline,
+                        focusedContainerColor   = XalaSurface,
+                        unfocusedContainerColor = XalaSurface,
+                        focusedTextColor        = XalaText,
+                        unfocusedTextColor      = XalaText,
+                        cursorColor             = XalaAccent,
+                        focusedLabelColor       = XalaAccent
                     )
                 )
 
-                // Campo contraseña
+                // Contraseña
                 OutlinedTextField(
                     value = password,
                     onValueChange = { password = it },
                     label = { Text("Contraseña", color = XalaMuted, fontSize = 13.sp) },
-                    leadingIcon = { Icon(Icons.Default.Lock, null, tint = XalaAccent.copy(0.7f), modifier = Modifier.size(20.dp)) },
+                    leadingIcon = {
+                        Icon(Icons.Default.Lock, null, tint = XalaAccent.copy(0.7f), modifier = Modifier.size(20.dp))
+                    },
                     trailingIcon = {
                         IconButton(onClick = { showPass = !showPass }) {
-                            Icon(if (showPass) Icons.Default.VisibilityOff else Icons.Default.Visibility, null, tint = XalaMuted)
+                            Icon(
+                                if (showPass) Icons.Default.VisibilityOff else Icons.Default.Visibility,
+                                null, tint = XalaMuted
+                            )
                         }
                     },
                     visualTransformation = if (showPass) VisualTransformation.None else PasswordVisualTransformation(),
@@ -139,28 +150,38 @@ fun LoginScreen(
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(14.dp),
                     colors = OutlinedTextFieldDefaults.colors(
-                        focusedBorderColor = XalaAccent, unfocusedBorderColor = XalaOutline,
-                        focusedContainerColor = XalaSurface, unfocusedContainerColor = XalaSurface,
-                        focusedTextColor = XalaText, unfocusedTextColor = XalaText,
-                        cursorColor = XalaAccent, focusedLabelColor = XalaAccent
+                        focusedBorderColor      = XalaAccent,
+                        unfocusedBorderColor    = XalaOutline,
+                        focusedContainerColor   = XalaSurface,
+                        unfocusedContainerColor = XalaSurface,
+                        focusedTextColor        = XalaText,
+                        unfocusedTextColor      = XalaText,
+                        cursorColor             = XalaAccent,
+                        focusedLabelColor       = XalaAccent
                     )
                 )
 
                 // Error
                 if (uiState is AuthUiState.Error) {
-                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
                         Icon(Icons.Default.ErrorOutline, null, tint = XalaError, modifier = Modifier.size(16.dp))
                         Text((uiState as AuthUiState.Error).message, color = XalaError, fontSize = 13.sp)
                     }
                 }
 
-                // Botón entrar
+                // Botón Entrar
                 Button(
                     onClick = { focusManager.clearFocus(); viewModel.signIn(email, password) },
                     modifier = Modifier.fillMaxWidth().height(52.dp),
                     enabled = uiState !is AuthUiState.Loading,
                     shape = RoundedCornerShape(14.dp),
-                    colors = ButtonDefaults.buttonColors(containerColor = XalaAccent, contentColor = Color.Black)
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = XalaAccent,
+                        contentColor   = Color.Black
+                    )
                 ) {
                     if (uiState is AuthUiState.Loading) {
                         CircularProgressIndicator(modifier = Modifier.size(20.dp), color = Color.Black, strokeWidth = 2.dp)
@@ -175,17 +196,14 @@ fun LoginScreen(
                     Text("Regístrate", color = XalaAccent, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
                 }
 
-                // ── Acceso administrador ──────────────────────────────────────
-                HorizontalDivider(
-                    modifier = Modifier.padding(top = 8.dp),
-                    color = XalaOutline
-                )
+                // ── Acceso Administrador (discreto, al fondo) ────────────────────
+                HorizontalDivider(color = XalaOutline)
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
                         .clip(RoundedCornerShape(10.dp))
                         .clickable { onNavigateToAdmin() }
-                        .padding(vertical = 12.dp),
+                        .padding(vertical = 10.dp),
                     horizontalArrangement = Arrangement.Center,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
@@ -193,15 +211,10 @@ fun LoginScreen(
                         Icons.Default.AdminPanelSettings,
                         contentDescription = null,
                         tint = XalaMuted,
-                        modifier = Modifier.size(16.dp)
+                        modifier = Modifier.size(15.dp)
                     )
                     Spacer(Modifier.width(6.dp))
-                    Text(
-                        "Acceso Administrador",
-                        color = XalaMuted,
-                        fontSize = 13.sp,
-                        fontWeight = FontWeight.Medium
-                    )
+                    Text("Acceso Administrador", color = XalaMuted, fontSize = 12.sp)
                 }
             }
         }
