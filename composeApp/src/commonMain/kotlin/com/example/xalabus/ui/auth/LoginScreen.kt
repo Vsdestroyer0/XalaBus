@@ -75,43 +75,48 @@ fun LoginScreen(
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.spacedBy(20.dp)
             ) {
-                // Ícono bus ámbar
+                // Ícono bus ámbar (grande, centrado)
                 Box(
                     modifier = Modifier
-                        .size(80.dp)
-                        .clip(RoundedCornerShape(24.dp))
-                        .background(XalaAccent.copy(alpha = 0.10f)),
+                        .size(88.dp)
+                        .clip(RoundedCornerShape(26.dp))
+                        .background(XalaAccent.copy(alpha = 0.18f)),
                     contentAlignment = Alignment.Center
                 ) {
                     Icon(
                         Icons.Default.DirectionsBus,
                         contentDescription = null,
                         tint = XalaAccent,
-                        modifier = Modifier.size(38.dp)
+                        modifier = Modifier.size(46.dp)
                     )
                 }
 
-                // Título
+                // Título centrado
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Text("Bienvenido a", color = XalaMuted, fontSize = 14.sp, letterSpacing = 2.sp)
-                    Text("XalaBus", color = XalaText, fontSize = 30.sp, fontWeight = FontWeight.Bold)
+                    Text("Bienvenido a", color = XalaText, fontSize = 18.sp)
+                    Text(
+                        "XalaBus",
+                        color = XalaText,
+                        fontSize = 32.sp,
+                        fontWeight = FontWeight.Bold
+                    )
                 }
 
-                Spacer(Modifier.height(4.dp))
+                Spacer(Modifier.height(8.dp))
 
                 // Email
                 OutlinedTextField(
                     value = email,
                     onValueChange = { email = it },
-                    label = { Text("Correo electrónico", color = XalaMuted, fontSize = 13.sp) },
+                    placeholder = { Text("Correo electrónico", color = XalaMuted, fontSize = 14.sp) },
                     leadingIcon = {
-                        Icon(Icons.Default.Email, null, tint = XalaAccent.copy(0.7f), modifier = Modifier.size(20.dp))
+                        Icon(Icons.Default.Email, null, tint = XalaMuted, modifier = Modifier.size(20.dp))
                     },
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email, imeAction = ImeAction.Next),
                     keyboardActions = KeyboardActions(onNext = { focusManager.moveFocus(FocusDirection.Down) }),
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(14.dp),
+                    shape = RoundedCornerShape(16.dp),
                     colors = OutlinedTextFieldDefaults.colors(
                         focusedBorderColor      = XalaAccent,
                         unfocusedBorderColor    = XalaOutline,
@@ -119,8 +124,7 @@ fun LoginScreen(
                         unfocusedContainerColor = XalaSurface,
                         focusedTextColor        = XalaText,
                         unfocusedTextColor      = XalaText,
-                        cursorColor             = XalaAccent,
-                        focusedLabelColor       = XalaAccent
+                        cursorColor             = XalaAccent
                     )
                 )
 
@@ -128,9 +132,9 @@ fun LoginScreen(
                 OutlinedTextField(
                     value = password,
                     onValueChange = { password = it },
-                    label = { Text("Contraseña", color = XalaMuted, fontSize = 13.sp) },
+                    placeholder = { Text("Contraseña", color = XalaMuted, fontSize = 14.sp) },
                     leadingIcon = {
-                        Icon(Icons.Default.Lock, null, tint = XalaAccent.copy(0.7f), modifier = Modifier.size(20.dp))
+                        Icon(Icons.Default.Lock, null, tint = XalaMuted, modifier = Modifier.size(20.dp))
                     },
                     trailingIcon = {
                         IconButton(onClick = { showPass = !showPass }) {
@@ -148,7 +152,7 @@ fun LoginScreen(
                     }),
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(14.dp),
+                    shape = RoundedCornerShape(16.dp),
                     colors = OutlinedTextFieldDefaults.colors(
                         focusedBorderColor      = XalaAccent,
                         unfocusedBorderColor    = XalaOutline,
@@ -156,8 +160,7 @@ fun LoginScreen(
                         unfocusedContainerColor = XalaSurface,
                         focusedTextColor        = XalaText,
                         unfocusedTextColor      = XalaText,
-                        cursorColor             = XalaAccent,
-                        focusedLabelColor       = XalaAccent
+                        cursorColor             = XalaAccent
                     )
                 )
 
@@ -175,9 +178,9 @@ fun LoginScreen(
                 // Botón Entrar
                 Button(
                     onClick = { focusManager.clearFocus(); viewModel.signIn(email, password) },
-                    modifier = Modifier.fillMaxWidth().height(52.dp),
+                    modifier = Modifier.fillMaxWidth().height(56.dp),
                     enabled = uiState !is AuthUiState.Loading,
-                    shape = RoundedCornerShape(14.dp),
+                    shape = RoundedCornerShape(16.dp),
                     colors = ButtonDefaults.buttonColors(
                         containerColor = XalaAccent,
                         contentColor   = Color.Black
