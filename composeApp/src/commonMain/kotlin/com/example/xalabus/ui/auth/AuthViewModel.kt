@@ -69,7 +69,7 @@ class AuthViewModel : ViewModel() {
         _uiState.value = AuthUiState.Loading
         viewModelScope.launch {
             try {
-                supabase.auth.signUpWith(Email) {
+                supabase.auth.signUpWith(Email, redirectUrl = "xalabus://autenticacion") {
                     this.email = email.trim()
                     this.password = password
                 }

@@ -1,6 +1,7 @@
 package com.example.xalabus.ui.auth
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
@@ -11,6 +12,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusDirection
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalFocusManager
@@ -22,7 +24,7 @@ import androidx.compose.ui.unit.sp
 // ── Paleta XalaBus Dark ─────────────────────────────────────────────────────
 private val XalaBg      = Color(0xFF0A0A0A)
 private val XalaSurface = Color(0xFF161616)
-private val XalaAccent  = Color(0xFFF5C518)   // amarillo autobús
+private val XalaAccent  = Color(0xFFF5C518)
 private val XalaText    = Color(0xFFFFFFFF)
 private val XalaMuted   = Color(0xFF8A8A8A)
 private val XalaOutline = Color(0xFF2C2C2C)
@@ -32,7 +34,8 @@ private val XalaError   = Color(0xFFFF4444)
 fun LoginScreen(
     viewModel: AuthViewModel,
     onLoginSuccess: () -> Unit,
-    onNavigateToRegister: () -> Unit
+    onNavigateToRegister: () -> Unit,
+    onBack: () -> Unit
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val focusManager = LocalFocusManager.current
@@ -54,18 +57,10 @@ fun LoginScreen(
         focusedLabelColor         = XalaAccent,
         unfocusedLabelColor       = XalaMuted,
         cursorColor               = XalaAccent,
-        focusedLeadingIconColor   = XalaAccent,
-        unfocusedLeadingIconColor = XalaMuted,
-        focusedTrailingIconColor   = XalaAccent,
-        unfocusedTrailingIconColor = XalaMuted,
         focusedTextColor          = XalaText,
         unfocusedTextColor        = XalaText,
         focusedContainerColor     = XalaSurface,
         unfocusedContainerColor   = XalaSurface,
-        errorBorderColor          = XalaError,
-        errorTextColor            = XalaText,
-        errorContainerColor       = XalaSurface,
-        errorLeadingIconColor     = XalaError,
     )
 
     Box(
@@ -80,6 +75,17 @@ fun LoginScreen(
             verticalArrangement = Arrangement.Center,
             horizontalAlignment = Alignment.Start
         ) {
+            // ── Botón Volver ────────────────────────────────────────────────
+            IconButton(
+                onClick = onBack,
+                modifier = Modifier
+                    .background(XalaSurface, shape = RoundedCornerShape(12.dp))
+                    .size(44.dp)
+            ) {
+                Icon(Icons.Default.ArrowBack, contentDescription = "Regresar", tint = XalaText)
+            }
+
+            Spacer(Modifier.height(32.dp))
 
             // ── Ícono de marca ──────────────────────────────────────────────
             Box(
@@ -131,13 +137,8 @@ fun LoginScreen(
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(12.dp),
                 colors = fieldColors,
-                keyboardOptions = KeyboardOptions(
-                    keyboardType = KeyboardType.Email,
-                    imeAction = ImeAction.Next
-                ),
-                keyboardActions = KeyboardActions(
-                    onNext = { focusManager.moveFocus(FocusDirection.Down) }
-                ),
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email, imeAction = ImeAction.Next),
+                keyboardActions = KeyboardActions(onNext = { focusManager.moveFocus(FocusDirection.Down) }),
                 isError = uiState is AuthUiState.Error
             )
 
@@ -153,7 +154,7 @@ fun LoginScreen(
                     IconButton(onClick = { passwordVisible = !passwordVisible }) {
                         Icon(
                             imageVector = if (passwordVisible) Icons.Default.VisibilityOff else Icons.Default.Visibility,
-                            contentDescription = if (passwordVisible) "Ocultar" else "Mostrar"
+                            contentDescription = null
                         )
                     }
                 },
@@ -162,16 +163,11 @@ fun LoginScreen(
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(12.dp),
                 colors = fieldColors,
-                keyboardOptions = KeyboardOptions(
-                    keyboardType = KeyboardType.Password,
-                    imeAction = ImeAction.Done
-                ),
-                keyboardActions = KeyboardActions(
-                    onDone = {
-                        focusManager.clearFocus()
-                        viewModel.signIn(email, password)
-                    }
-                ),
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password, imeAction = ImeAction.Done),
+                keyboardActions = KeyboardActions(onDone = {
+                    focusManager.clearFocus()
+                    viewModel.signIn(email, password)
+                }),
                 isError = uiState is AuthUiState.Error
             )
 
@@ -192,24 +188,13 @@ fun LoginScreen(
                     focusManager.clearFocus()
                     viewModel.signIn(email, password)
                 },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(52.dp),
+                modifier = Modifier.fillMaxWidth().height(52.dp),
                 shape = RoundedCornerShape(12.dp),
                 enabled = uiState !is AuthUiState.Loading,
-                colors = ButtonDefaults.buttonColors(
-                    containerColor         = XalaAccent,
-                    contentColor           = Color.Black,
-                    disabledContainerColor = XalaAccent.copy(alpha = 0.4f),
-                    disabledContentColor   = Color.Black.copy(alpha = 0.4f)
-                )
+                colors = ButtonDefaults.buttonColors(containerColor = XalaAccent, contentColor = Color.Black)
             ) {
                 if (uiState is AuthUiState.Loading) {
-                    CircularProgressIndicator(
-                        modifier = Modifier.size(22.dp),
-                        color = Color.Black,
-                        strokeWidth = 2.dp
-                    )
+                    CircularProgressIndicator(modifier = Modifier.size(22.dp), color = Color.Black, strokeWidth = 2.dp)
                 } else {
                     Text("Entrar", fontWeight = FontWeight.SemiBold, fontSize = 16.sp)
                 }
@@ -217,26 +202,15 @@ fun LoginScreen(
 
             Spacer(Modifier.height(20.dp))
 
-            // ── Link a Registro ─────────────────────────────────────────────
+            // ── Registro ────────────────────────────────────────────────────
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.Center,
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text("¿No tienes cuenta? ", color = XalaMuted, fontSize = 14.sp)
-                TextButton(
-                    onClick = {
-                        viewModel.resetState()
-                        onNavigateToRegister()
-                    },
-                    contentPadding = PaddingValues(0.dp)
-                ) {
-                    Text(
-                        "Regístrate",
-                        color = XalaAccent,
-                        fontWeight = FontWeight.SemiBold,
-                        fontSize = 14.sp
-                    )
+                TextButton(onClick = onNavigateToRegister) {
+                    Text("Regístrate", color = XalaAccent, fontWeight = FontWeight.SemiBold)
                 }
             }
         }
