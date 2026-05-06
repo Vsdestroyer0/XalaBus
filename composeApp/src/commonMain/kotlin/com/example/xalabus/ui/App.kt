@@ -36,37 +36,9 @@ import org.jetbrains.compose.resources.decodeToImageBitmap
 import xalabus.composeapp.generated.resources.*
 import xalabus.composeapp.generated.resources.Res
 
-private enum class AppDestination { AUTH, MAIN, ADMIN_LOGIN, ADMIN_DASHBOARD }
+private enum class AppDestination { AUTH, MAIN, ADMIN_DASHBOARD }
 private enum class AuthScreen     { LOGIN, REGISTER }
 
-// ── Temas de Color Premium XalaBus ──────────────────────────────────────────
-private val XalaAmber = Color(0xFFF5C518)
-private val XalaDark  = Color(0xFF0A0A0A)
-private val XalaSurface = Color(0xFF161616)
-
-private val XalaBusDarkColors = darkColorScheme(
-    primary = XalaAmber,
-    onPrimary = Color.Black,
-    secondary = XalaAmber.copy(alpha = 0.8f),
-    background = XalaDark,
-    surface = XalaSurface,
-    onBackground = Color.White,
-    onSurface = Color.White,
-    outline = Color(0xFF2C2C2C),
-    surfaceVariant = Color(0xFF1E1E1E)
-)
-
-private val XalaBusLightColors = lightColorScheme(
-    primary = XalaAmber,
-    onPrimary = Color.Black,
-    secondary = XalaAmber.copy(alpha = 0.8f),
-    background = Color(0xFFF8F8F8),
-    surface = Color.White,
-    onBackground = Color.Black,
-    onSurface = Color.Black,
-    outline = Color(0xFFE0E0E0),
-    surfaceVariant = Color(0xFFF0F0F0)
-)
 
 @Composable
 fun LoadingScreen() {
@@ -110,7 +82,6 @@ fun App(
                             destination = AppDestination.MAIN 
                         },
                         onNavigateToRegister = { currentAuthScreen = AuthScreen.REGISTER },
-                        onNavigateToAdmin    = { destination = AppDestination.ADMIN_LOGIN },
                         onBack               = { destination = AppDestination.MAIN }
                     )
                     AuthScreen.REGISTER -> RegisterScreen(
@@ -135,12 +106,6 @@ fun App(
                         authViewModel.signOut()
                         isAuthenticated = false
                     }
-                )
-
-                AppDestination.ADMIN_LOGIN -> AdminLoginScreen(
-                    viewModel      = adminViewModel,
-                    onLoginSuccess = { destination = AppDestination.ADMIN_DASHBOARD },
-                    onBack         = { destination = AppDestination.AUTH }
                 )
 
                 AppDestination.ADMIN_DASHBOARD -> AdminDashboardScreen(

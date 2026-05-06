@@ -1,5 +1,6 @@
 package com.example.xalabus
 
+import android.content.Intent
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -10,12 +11,17 @@ import androidx.compose.ui.tooling.preview.Preview
 import com.example.xalabus.db.DriverFactory
 import com.example.xalabus.core.util.AndroidMapFileManager
 import com.example.xalabus.core.prefs.appContext
+import com.example.xalabus.data.SupabaseClientProvider
 import com.example.xalabus.ui.App
+import io.github.jan.supabase.auth.handleDeeplinks
 import org.maplibre.android.MapLibre
 import org.maplibre.android.WellKnownTileServer
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
+        // Manejar Deep Link de Supabase
+        SupabaseClientProvider.client.handleDeeplinks(intent)
+
         // Inicializar MapLibre antes de setContent
         MapLibre.getInstance(this, null, WellKnownTileServer.MapLibre)
         enableEdgeToEdge()
@@ -34,6 +40,11 @@ class MainActivity : ComponentActivity() {
             // Pasamos ambos a la función App de commonMain
             App(driverFactory = driverFactory, fileManager = fileManager)
         }
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        SupabaseClientProvider.client.handleDeeplinks(intent)
     }
 }
 
