@@ -10,7 +10,7 @@ data class RouteJson(
     val desc: String? = null,
     val fare: String? = "$12.00",
     val frequency: String? = "15 min",
-    val variants: List<VariantJson>
+    val variants: List<VariantJson> = emptyList()
 )
 
 @Serializable

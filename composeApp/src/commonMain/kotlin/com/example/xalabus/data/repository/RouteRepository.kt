@@ -13,46 +13,34 @@ class RouteRepository(private val db: AppDatabase) {
     private val jsonConfig = Json { ignoreUnknownKeys = true }
 
     /**
-     * Prepopula la base de datos solo con Rutas y sus Geometrías (Polylines).
-     * Se eliminó el procesamiento de paradas para optimizar el rendimiento y evitar errores de mapeo.
+     * Inserta una ruta individual y sus geometrías.
      */
-    suspend fun checkAndPrepopulate(routesJson: String) = withContext(Dispatchers.IO) {
-        println("XALABUS_DEBUG: Iniciando carga de rutas...")
-        try {
-            val routes = jsonConfig.decodeFromString<List<RouteJson>>(routesJson)
+    fun insertSingleRoute(route: RouteJson) {
+        val routeIdStr = route.id.toString()
+        
+        // 1. Insertar metadatos
+        queries.insertRoute(
+            id = routeIdStr,
+            name = route.desc ?: route.name,
+            fare = route.fare ?: "12.00",
+            frequency = route.frequency ?: "15 min"
+        )
 
-            queries.transaction {
-                val currentRoutes = queries.selectAllRoutes().executeAsList()
-
-                if (currentRoutes.isEmpty()) {
-                    println("XALABUS_DEBUG: DB vacía. Procesando ${routes.size} rutas...")
-
-                    routes.forEach { route ->
-                        val routeIdStr = route.id.toString()
-
-                        // 1. Insertar metadatos de la ruta
-                        queries.insertRoute(
-                            id = routeIdStr,
-                            name = route.desc ?: route.name,
-                            fare = route.fare ?: "12.00",
-                            frequency = route.frequency ?: "15 min"
-                        )
-
-                        // 2. Insertar las geometrías (Ida y Vuelta si existen)
-                        route.variants.forEach { variant ->
-                            queries.insertGeometry(
-                                routeId = routeIdStr,
-                                direction = variant.direction,
-                                polyline = Json.encodeToString(variant.coords)
-                            )
-                        }
-                    }
-                }
-            }
-            println("XALABUS_DEBUG: Carga finalizada correctamente.")
-        } catch (e: Exception) {
-            println("XALABUS_DEBUG: ERROR EN PREPOPULATE -> ${e.message}")
+        // 2. Insertar las geometrías
+        route.variants.forEach { variant ->
+            queries.insertGeometry(
+                routeId = routeIdStr,
+                direction = variant.direction,
+                polyline = Json.encodeToString(variant.coords)
+            )
         }
+    }
+
+    /**
+     * Verifica si la base de datos está vacía.
+     */
+    suspend fun isDatabaseEmpty(): Boolean = withContext(Dispatchers.IO) {
+        queries.selectAllRoutes().executeAsList().isEmpty()
     }
 
     // --- Consultas ---
