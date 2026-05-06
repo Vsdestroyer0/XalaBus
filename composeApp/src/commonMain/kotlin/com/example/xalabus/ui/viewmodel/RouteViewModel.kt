@@ -74,21 +74,44 @@ class RouteViewModel(
     }
 
     @OptIn(ExperimentalResourceApi::class)
+    private val jsonConfig = Json { 
+        ignoreUnknownKeys = true 
+        coerceInputValues = true
+    }
+
+    @OptIn(ExperimentalResourceApi::class)
     fun initializeData() {
         viewModelScope.launch(Dispatchers.IO) {
             try {
-                val routeBytes = Res.readBytes("files/master_routes_optimized.json")
+                println("XALABUS_DEBUG: Iniciando initializeData...")
                 val mapBytes = Res.readBytes("files/xalapa.mbtiles")
-
-                // 1. Insertar solo rutas y geometrías
-                repository.checkAndPrepopulate(
-                    routesJson = routeBytes.decodeToString()
-                )
-
                 val internalPath = fileManager.saveMapFile("xalapa.mbtiles", mapBytes)
 
-                // 2. Traer rutas y limpiar nombres para la UI
-                val allRoutes = repository.getAllRoutes().map { route ->
+                if (repository.isDatabaseEmpty()) {
+                    println("XALABUS_DEBUG: Base de datos vacía, cargando desde index.json...")
+                    
+                    val indexBytes = Res.readBytes("files/routes/Xalapa/index.json")
+                    val indexJson = indexBytes.decodeToString()
+                    val index = jsonConfig.decodeFromString<List<com.example.xalabus.data.model.RouteJson>>(indexJson)
+                    
+                    println("XALABUS_DEBUG: Índice cargado con ${index.size} rutas.")
+
+                    index.forEach { indexItem ->
+                        try {
+                            val routePath = "files/routes/Xalapa/route_${indexItem.id}.json"
+                            val routeBytes = Res.readBytes(routePath)
+                            val routeData = jsonConfig.decodeFromString<com.example.xalabus.data.model.RouteJson>(routeBytes.decodeToString())
+                            repository.insertSingleRoute(routeData)
+                        } catch (e: Exception) {
+                            println("XALABUS_DEBUG: Error cargando ruta ${indexItem.id}: ${e.message}")
+                        }
+                    }
+                }
+
+                val allRoutes = repository.getAllRoutes()
+                println("XALABUS_DEBUG: Rutas en DB: ${allRoutes.size}")
+
+                val processedRoutes = allRoutes.map { route ->
                     val finalName = if (route.name.contains("1000")) {
                         route.name.substringAfter("-").trim().ifEmpty { route.name }
                     } else {
@@ -99,12 +122,12 @@ class RouteViewModel(
 
                 launch(Dispatchers.Main) {
                     _mapFilePath.value = internalPath
-                    _allRoutes.value = allRoutes
+                    _allRoutes.value = processedRoutes
                     _isDataLoaded.value = true
                 }
 
             } catch (e: Exception) {
-                println("Error crítico en ViewModel: ${e.message}")
+                println("XALABUS_DEBUG: Error crítico: ${e.message}")
                 launch(Dispatchers.Main) { _isDataLoaded.value = true }
             }
         }

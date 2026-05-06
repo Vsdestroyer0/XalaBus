@@ -1,0 +1,835 @@
+[
+  {
+    "id": 1,
+    "name": "Ruta 10001",
+    "desc": "Avila Camacho - Zona UV - Xalapa 2 Mil - Lomas Verdes - IPE - Bugambilias",
+    "fare": "12.00",
+    "frequency": "45 min"
+  },
+  {
+    "id": 2,
+    "name": "Buena Vista - Central de Abastos",
+    "desc": "Buena Vista - Central de Abastos",
+    "fare": "12.00",
+    "frequency": "41 min"
+  },
+  {
+    "id": 3,
+    "name": "Ruta 10004",
+    "desc": "Avenida Xalapa(economía) - 20 noviembre - Lazaro Cardenas",
+    "fare": "12.00",
+    "frequency": "37 min"
+  },
+  {
+    "id": 4,
+    "name": "Ruta 10002",
+    "desc": "Campo de tiro - Hernandez Castillo - Sayago",
+    "fare": "12.00",
+    "frequency": "36 min"
+  },
+  {
+    "id": 5,
+    "name": "Ruta 10002",
+    "desc": "Miradores - Banderilla",
+    "fare": "12.00",
+    "frequency": "35 min"
+  },
+  {
+    "id": 6,
+    "name": "Ruta 10002",
+    "desc": "Mercado - Pipila - Jardines - Carolino Anaya",
+    "fare": "12.00",
+    "frequency": "34 min"
+  },
+  {
+    "id": 7,
+    "name": "Ruta 10003",
+    "desc": "Buena Vista - Sauces- Berros - Caxa - Trancas - Pradera - Central de Abastos",
+    "fare": "12.00",
+    "frequency": "33 min"
+  },
+  {
+    "id": 8,
+    "name": "Ruta 10005",
+    "desc": "Reserva territorial - 20 de noviembre - Economía - Avenida Xalapa",
+    "fare": "12.00",
+    "frequency": "33 min"
+  },
+  {
+    "id": 9,
+    "name": "Ruta 10012",
+    "desc": "Sayago - Calle Nuevo León - Villa Hermosa - Sumidero",
+    "fare": "12.00",
+    "frequency": "33 min"
+  },
+  {
+    "id": 10,
+    "name": "Ruta 10014",
+    "desc": "Sayago - Av Xalapa - Hernandez Castillo - Campo de tiro",
+    "fare": "12.00",
+    "frequency": "32 min"
+  },
+  {
+    "id": 11,
+    "name": "Ruta 10004",
+    "desc": "Chedrahui Caram - Ejidal",
+    "fare": "12.00",
+    "frequency": "32 min"
+  },
+  {
+    "id": 12,
+    "name": "Ruta 10001",
+    "desc": "USISVER Miguel Alemán - Mártires 28 de Agosto",
+    "fare": "12.00",
+    "frequency": "15 min"
+  },
+  {
+    "id": 13,
+    "name": "Ruta 10003",
+    "desc": "Miguel Alemán - Cerro de Macuiltepetl - Centro",
+    "fare": "12.00",
+    "frequency": "15 min"
+  },
+  {
+    "id": 14,
+    "name": "Ruta 10004",
+    "desc": "Calvario - Panteón - Tecnica 72",
+    "fare": "12.00",
+    "frequency": "15 min"
+  },
+  {
+    "id": 15,
+    "name": "Ruta 10003",
+    "desc": "Murillo Vidal - Plaza Américas - Torre Ánimas - Sev - Coapexpan - Terminal",
+    "fare": "12.00",
+    "frequency": "15 min"
+  },
+  {
+    "id": 16,
+    "name": "Ruta 10003",
+    "desc": "El Olmo - Torre Ánimas - Murillo Vidal - Coapexpan",
+    "fare": "12.00",
+    "frequency": "15 min"
+  },
+  {
+    "id": 17,
+    "name": "Ruta 10004",
+    "desc": "El Haya - Zona UV - Bugambilias",
+    "fare": "12.00",
+    "frequency": "15 min"
+  },
+  {
+    "id": 18,
+    "name": "Ruta 10006",
+    "desc": "Ojo de Agua - Zona UV - El Haya",
+    "fare": "12.00",
+    "frequency": "15 min"
+  },
+  {
+    "id": 19,
+    "name": "Ruta 10009",
+    "desc": "Col. Veracruz - 20 de Noviembre - Central de Abastos",
+    "fare": "12.00",
+    "frequency": "15 min"
+  },
+  {
+    "id": 20,
+    "name": "Ruta 10011",
+    "desc": "Artículo 3ro - Avila Camacho",
+    "fare": "12.00",
+    "frequency": "15 min"
+  },
+  {
+    "id": 21,
+    "name": "Ruta 10017",
+    "desc": "San Andrés Tlalnehuayocan - Luz del Barrio - Central de Abastos",
+    "fare": "12.00",
+    "frequency": "15 min"
+  },
+  {
+    "id": 22,
+    "name": "Ruta 10017",
+    "desc": "San Andrés Tlalnelhuayocan - Luz del Barrio - Central de Abastos",
+    "fare": "12.00",
+    "frequency": "15 min"
+  },
+  {
+    "id": 23,
+    "name": "Ruta 10015",
+    "desc": "San Andrés Tlalnehuayocan - Luz del Barrio - Clavijero - Zipor",
+    "fare": "12.00",
+    "frequency": "15 min"
+  },
+  {
+    "id": 24,
+    "name": "Ruta 10019",
+    "desc": "La haciendita - Caxa - Central de Abastos",
+    "fare": "12.00",
+    "frequency": "15 min"
+  },
+  {
+    "id": 25,
+    "name": "Ruta 10020",
+    "desc": "Experimental - Plaza Cristal - Central de Abastos",
+    "fare": "12.00",
+    "frequency": "15 min"
+  },
+  {
+    "id": 26,
+    "name": "Ruta 10019",
+    "desc": "La haciendita - Caxa - Central de Abastos",
+    "fare": "12.00",
+    "frequency": "15 min"
+  },
+  {
+    "id": 27,
+    "name": "Ruta 10020",
+    "desc": "Experimental - Cristal - Central de Abastos",
+    "fare": "12.00",
+    "frequency": "15 min"
+  },
+  {
+    "id": 28,
+    "name": "Ruta 10025",
+    "desc": "Homex - Vasconcelos - Av. Xalapa - Centro",
+    "fare": "12.00",
+    "frequency": "15 min"
+  },
+  {
+    "id": 29,
+    "name": "Ruta 10027",
+    "desc": "Col México - Lucas Martín - Av. Xalapa - Centro",
+    "fare": "12.00",
+    "frequency": "15 min"
+  },
+  {
+    "id": 30,
+    "name": "Ruta 10007",
+    "desc": "Campo de Tiro - Revolución - Clavijero",
+    "fare": "12.00",
+    "frequency": "15 min"
+  },
+  {
+    "id": 31,
+    "name": "Ruta 10009",
+    "desc": "El Moral - Revolución - Clavijero",
+    "fare": "12.00",
+    "frequency": "15 min"
+  },
+  {
+    "id": 32,
+    "name": "Ruta 10011",
+    "desc": "Col Higueras - Lázaro Cárdenas - Centro - Zona UV",
+    "fare": "12.00",
+    "frequency": "15 min"
+  },
+  {
+    "id": 33,
+    "name": "Ruta 10001",
+    "desc": "Sefiplan - Lazaro Cardenas - Circuito Presidentes - Ruiz Cortinez",
+    "fare": "12.00",
+    "frequency": "15 min"
+  },
+  {
+    "id": 34,
+    "name": "Ruta 10002",
+    "desc": "Reforma - Mercado - Sumidero",
+    "fare": "12.00",
+    "frequency": "15 min"
+  },
+  {
+    "id": 35,
+    "name": "Ruta 10002",
+    "desc": "Campo de tiro - Avenida Xalapa - Av México - Francisco Javier Clavijero",
+    "fare": "12.00",
+    "frequency": "15 min"
+  },
+  {
+    "id": 36,
+    "name": "Ruta 10002",
+    "desc": "Bugambilias - Lázaro Cardenas - Avila Camacho - Sauces",
+    "fare": "12.00",
+    "frequency": "15 min"
+  },
+  {
+    "id": 37,
+    "name": "Ruta 10016",
+    "desc": "Colonia Revolucion - Avenida Xalapa - Sayago",
+    "fare": "12.00",
+    "frequency": "15 min"
+  },
+  {
+    "id": 38,
+    "name": "Ruta 10020",
+    "desc": "Colonia Higueras - Avenida Américas - Avenida Xalapa",
+    "fare": "12.00",
+    "frequency": "15 min"
+  },
+  {
+    "id": 39,
+    "name": "Ruta 10023",
+    "desc": "San Andrés - Avenida Lázaro Cardes - Trancas",
+    "fare": "12.00",
+    "frequency": "15 min"
+  },
+  {
+    "id": 40,
+    "name": "Ruta 10019",
+    "desc": "Colonia Marina Nacional - Avenida 20 de Noviembre - Poeta Jesús Díaz",
+    "fare": "12.00",
+    "frequency": "15 min"
+  },
+  {
+    "id": 41,
+    "name": "Ruta 10016",
+    "desc": "Trancas -  20 de noviembre - Arteaga",
+    "fare": "12.00",
+    "frequency": "15 min"
+  },
+  {
+    "id": 42,
+    "name": "Ruta 10013",
+    "desc": "Trancas - Lázaro Cardenas - 20 de Noviembre - Plaza Crystal - Jardines de Xalapa - Sumidero - Campo de Tiro",
+    "fare": "12.00",
+    "frequency": "15 min"
+  },
+  {
+    "id": 43,
+    "name": "Ruta 10010",
+    "desc": "Santiago Andres - Martirez 28 de Agosto - Mercado",
+    "fare": "12.00",
+    "frequency": "15 min"
+  },
+  {
+    "id": 44,
+    "name": "Ruta 10020",
+    "desc": "Lomas Verdes - Xalapa 2000 - Rebsamen - Zona uv - Centro",
+    "fare": "12.00",
+    "frequency": "15 min"
+  },
+  {
+    "id": 45,
+    "name": "Ruta 10004",
+    "desc": "Avenida Americas - Pipila - Lazaro Cárdenas - Maestros Veracruzanos - Murillo Vidal - Berros - Rebsamen - Tecnológico",
+    "fare": "12.00",
+    "frequency": "15 min"
+  },
+  {
+    "id": 46,
+    "name": "Ruta 10001",
+    "desc": "Plaza Cristal - Lázaro Cárdenas - Chilpancingo - Comercial - Ruiz Cortinez - Barrios",
+    "fare": "12.00",
+    "frequency": "15 min"
+  },
+  {
+    "id": 47,
+    "name": "Ruta 10002",
+    "desc": "Luz del Barrio - Casa Blanca",
+    "fare": "12.00",
+    "frequency": "15 min"
+  },
+  {
+    "id": 48,
+    "name": "Ruta 10005",
+    "desc": "Coatepec Porthos - Xalapa Rotonda",
+    "fare": "12.00",
+    "frequency": "15 min"
+  },
+  {
+    "id": 49,
+    "name": "Ruta 10004",
+    "desc": "Xalapa - Encinos",
+    "fare": "12.00",
+    "frequency": "15 min"
+  },
+  {
+    "id": 50,
+    "name": "Ruta 10007",
+    "desc": "Mercado - Centro - Cristal - Peñascal - Sumidero - Campo de tiro",
+    "fare": "12.00",
+    "frequency": "15 min"
+  },
+  {
+    "id": 51,
+    "name": "Ruta 10001",
+    "desc": "Articulo 3ro - Lázaro Cárdenas - Trancas - La Pradera - La Hacienda",
+    "fare": "12.00",
+    "frequency": "15 min"
+  },
+  {
+    "id": 52,
+    "name": "Ruta 10005",
+    "desc": "Central de Abastos - La Martinica (Banderilla)",
+    "fare": "12.00",
+    "frequency": "15 min"
+  },
+  {
+    "id": 53,
+    "name": "Ruta 10007",
+    "desc": "Las Trancas - FOVISSSTE",
+    "fare": "12.00",
+    "frequency": "15 min"
+  },
+  {
+    "id": 54,
+    "name": "Ruta 10009",
+    "desc": "20 de Noviembre - Pacho Nuevo",
+    "fare": "12.00",
+    "frequency": "15 min"
+  },
+  {
+    "id": 55,
+    "name": "Ruta 10010",
+    "desc": "Central de Abastos - Campo de Tiro",
+    "fare": "12.00",
+    "frequency": "15 min"
+  },
+  {
+    "id": 56,
+    "name": "Ruta 10006",
+    "desc": "Centro - Clavijero - Casa Blanca",
+    "fare": "12.00",
+    "frequency": "15 min"
+  },
+  {
+    "id": 57,
+    "name": "Ruta 10007",
+    "desc": "Casa blanca, Plaza crystal",
+    "fare": "12.00",
+    "frequency": "15 min"
+  },
+  {
+    "id": 58,
+    "name": "Ruta 10009",
+    "desc": "Poeta Jesus Dias - Sumidero",
+    "fare": "12.00",
+    "frequency": "15 min"
+  },
+  {
+    "id": 59,
+    "name": "Ruta 10010",
+    "desc": "Casa blanca, Pipila, Clavijero",
+    "fare": "12.00",
+    "frequency": "15 min"
+  },
+  {
+    "id": 60,
+    "name": "Ruta 10011",
+    "desc": "Pipila - Sumidero",
+    "fare": "12.00",
+    "frequency": "15 min"
+  },
+  {
+    "id": 61,
+    "name": "Ruta 10012",
+    "desc": "Mercado terminal",
+    "fare": "12.00",
+    "frequency": "15 min"
+  },
+  {
+    "id": 62,
+    "name": "Ruta 10013",
+    "desc": "Sumidero - jardines",
+    "fare": "12.00",
+    "frequency": "15 min"
+  },
+  {
+    "id": 63,
+    "name": "Ruta 10014",
+    "desc": "Sumidero - Centro - Plaza Crystal - Calvario",
+    "fare": "12.00",
+    "frequency": "15 min"
+  },
+  {
+    "id": 64,
+    "name": "Ruta 10003",
+    "desc": "28 de agosto - San Antonio",
+    "fare": "12.00",
+    "frequency": "15 min"
+  },
+  {
+    "id": 65,
+    "name": "Ruta 10005",
+    "desc": "San Antonio - 28 de Agosto - Mercado",
+    "fare": "12.00",
+    "frequency": "15 min"
+  },
+  {
+    "id": 66,
+    "name": "Ruta 10008",
+    "desc": "Xocotla - 27 de agosto - Mecardo",
+    "fare": "12.00",
+    "frequency": "15 min"
+  },
+  {
+    "id": 67,
+    "name": "Ruta 10011",
+    "desc": "Ávila Camacho - Ignacio de la Llave - Sauces - Zona UV",
+    "fare": "12.00",
+    "frequency": "15 min"
+  },
+  {
+    "id": 69,
+    "name": "Ruta 10004",
+    "desc": "Coapexpan - Araucarias - Torreanimas",
+    "fare": "12.00",
+    "frequency": "15 min"
+  },
+  {
+    "id": 70,
+    "name": "Ruta 10006",
+    "desc": "Coapexpan - Tecnica 72",
+    "fare": "12.00",
+    "frequency": "15 min"
+  },
+  {
+    "id": 71,
+    "name": "Ruta 10007",
+    "desc": "Tecnica 72 - Coapexpan",
+    "fare": "12.00",
+    "frequency": "15 min"
+  },
+  {
+    "id": 72,
+    "name": "Ruta 10005",
+    "desc": "Instituto Tecnológico - Arco Sur - Rebsamen - Sauces - Avila Camacho - Americas - Pipila - Lázaro Cárdenas - Arco Sur - Instituto Tecnológico",
+    "fare": "12.00",
+    "frequency": "15 min"
+  },
+  {
+    "id": 73,
+    "name": "Ruta 10002",
+    "desc": "Estacón - Zona UV",
+    "fare": "12.00",
+    "frequency": "15 min"
+  },
+  {
+    "id": 74,
+    "name": "Ruta 10003",
+    "desc": "Jardines - Estación - Centro",
+    "fare": "12.00",
+    "frequency": "15 min"
+  },
+  {
+    "id": 75,
+    "name": "Ruta 10002",
+    "desc": "Centro - central de abasto",
+    "fare": "12.00",
+    "frequency": "15 min"
+  },
+  {
+    "id": 76,
+    "name": "Ruta 10004",
+    "desc": "Buena Vista - Centro",
+    "fare": "12.00",
+    "frequency": "15 min"
+  },
+  {
+    "id": 77,
+    "name": "Ruta 10001",
+    "desc": "Coapexpan - Murillo Vidal - Torre Ánimas - Araucarias",
+    "fare": "12.00",
+    "frequency": "15 min"
+  },
+  {
+    "id": 78,
+    "name": "Ruta 10005",
+    "desc": "FOVISSTE - Calvario - IMSS",
+    "fare": "12.00",
+    "frequency": "15 min"
+  },
+  {
+    "id": 79,
+    "name": "Ruta 10006",
+    "desc": "FOVISSTE - Calvario",
+    "fare": "12.00",
+    "frequency": "15 min"
+  },
+  {
+    "id": 80,
+    "name": "Ruta 10006",
+    "desc": "Ruiz Cortines - Fovisste - Lazaro Cardenas",
+    "fare": "12.00",
+    "frequency": "15 min"
+  },
+  {
+    "id": 81,
+    "name": "Ruta 10009",
+    "desc": "Ruiz Cortinez - Zona UV",
+    "fare": "12.00",
+    "frequency": "15 min"
+  },
+  {
+    "id": 82,
+    "name": "Circuito Lomas Verdes - Medicina",
+    "desc": "Circuito Lomas Verdes - Medicina",
+    "fare": "12.00",
+    "frequency": "15 min"
+  },
+  {
+    "id": 83,
+    "name": "Estación - Villa Hermosa - Ruiz Cortinez - Sauces",
+    "desc": "Estación - Villa Hermosa - Ruiz Cortinez - Sauces",
+    "fare": "12.00",
+    "frequency": "15 min"
+  },
+  {
+    "id": 84,
+    "name": "Escuela Normal - Juarez - Centro - Berros - Rebsamen - Ojo de agua",
+    "desc": "Escuela Normal - Juarez - Centro - Berros - Rebsamen - Ojo de agua",
+    "fare": "12.00",
+    "frequency": "15 min"
+  },
+  {
+    "id": 85,
+    "name": "Bugambilias - Trancas - Lázaro Cárdenas - SEFIPLAN - Avenida Xalapa - Ignacio de la Llave - IMSS - Carranza - Zona UV - Rebsamen - Xalapa 2000 - Arco Sur - Tecnologico",
+    "desc": "Bugambilias - Trancas - Lázaro Cárdenas - SEFIPLAN - Avenida Xalapa - Ignacio de la Llave - IMSS - Carranza - Zona UV - Rebsamen - Xalapa 2000 - Arco Sur - Tecnologico",
+    "fare": "12.00",
+    "frequency": "15 min"
+  },
+  {
+    "id": 86,
+    "name": "Articulo 3ro - Ruiz Cortinez - SEFIPLAN - Lázaro Cárdenas - Chedraui Caram - Plaza Americas - Trancas - Arco Sur - Tecnologico",
+    "desc": "Articulo 3ro - Ruiz Cortinez - SEFIPLAN - Lázaro Cárdenas - Chedraui Caram - Plaza Americas - Trancas - Arco Sur - Tecnologico",
+    "fare": "12.00",
+    "frequency": "15 min"
+  },
+  {
+    "id": 87,
+    "name": "Ruta Torres - Centro",
+    "desc": "Ruta Torres - Centro",
+    "fare": "12.00",
+    "frequency": "15 min"
+  },
+  {
+    "id": 88,
+    "name": "Xocotla - Martires 28 de Agosto - Sayago",
+    "desc": "Xocotla - Martires 28 de Agosto - Sayago",
+    "fare": "12.00",
+    "frequency": "15 min"
+  },
+  {
+    "id": 89,
+    "name": "Ruta 2 Buena Vista - Central de Abastos",
+    "desc": "Ruta 2 Buena Vista - Central de Abastos",
+    "fare": "12.00",
+    "frequency": "15 min"
+  },
+  {
+    "id": 90,
+    "name": "Pastoresa - Murillo Vidal - Centro",
+    "desc": "Pastoresa - Murillo Vidal - Centro",
+    "fare": "12.00",
+    "frequency": "15 min"
+  },
+  {
+    "id": 91,
+    "name": "Sauces - Ojo de agua",
+    "desc": "Sauces - Ojo de agua",
+    "fare": "12.00",
+    "frequency": "15 min"
+  },
+  {
+    "id": 92,
+    "name": "Campo de tiro - Plaza Crystal - Mercado",
+    "desc": "Campo de tiro - Plaza Crystal - Mercado",
+    "fare": "12.00",
+    "frequency": "15 min"
+  },
+  {
+    "id": 93,
+    "name": "Estación - Calvario",
+    "desc": "Estación - Calvario",
+    "fare": "12.00",
+    "frequency": "15 min"
+  },
+  {
+    "id": 94,
+    "name": "Arco Sur - Rebsamen - Tecnológico - Trancas - Lázaro Cárdenas - Pipila - Américas - Avila Camacho - Ignacio de la llave - Sauces - Zona UV",
+    "desc": "Arco Sur - Rebsamen - Tecnológico - Trancas - Lázaro Cárdenas - Pipila - Américas - Avila Camacho - Ignacio de la llave - Sauces - Zona UV",
+    "fare": "12.00",
+    "frequency": "15 min"
+  },
+  {
+    "id": 95,
+    "name": "Circuito Lomas Verdes - Medicina",
+    "desc": "Circuito Lomas Verdes - Medicina",
+    "fare": "12.00",
+    "frequency": "15 min"
+  },
+  {
+    "id": 96,
+    "name": "Estacion Terminal Bolivia",
+    "desc": "Estacion Terminal Bolivia",
+    "fare": "12.00",
+    "frequency": "15 min"
+  },
+  {
+    "id": 97,
+    "name": "Estación - Ignacio de la llave",
+    "desc": "Estación - Ignacio de la llave",
+    "fare": "12.00",
+    "frequency": "15 min"
+  },
+  {
+    "id": 98,
+    "name": "Calvario Terminal",
+    "desc": "Calvario Terminal",
+    "fare": "12.00",
+    "frequency": "15 min"
+  },
+  {
+    "id": 99,
+    "name": "Articulo 3ro - Zona UV - Berros - 20 de Noviembre - Av. Xalapa - Avila Camacho - Ruiz Cortinez",
+    "desc": "Articulo 3ro - Zona UV - Berros - 20 de Noviembre - Av. Xalapa - Avila Camacho - Ruiz Cortinez",
+    "fare": "12.00",
+    "frequency": "15 min"
+  },
+  {
+    "id": 100,
+    "name": "Lazaro Cardenas - Ruiz Cortinez",
+    "desc": "Lazaro Cardenas - Ruiz Cortinez",
+    "fare": "12.00",
+    "frequency": "15 min"
+  },
+  {
+    "id": 101,
+    "name": "Sefiplan - Lazaro Cardenas",
+    "desc": "Sefiplan - Lazaro Cardenas",
+    "fare": "12.00",
+    "frequency": "15 min"
+  },
+  {
+    "id": 102,
+    "name": "Sefiplan - Avila Camacho",
+    "desc": "Sefiplan - Avila Camacho",
+    "fare": "12.00",
+    "frequency": "15 min"
+  },
+  {
+    "id": 103,
+    "name": "Tecnica 72 - Circunvalacion",
+    "desc": "Tecnica 72 - Circunvalacion",
+    "fare": "12.00",
+    "frequency": "15 min"
+  },
+  {
+    "id": 104,
+    "name": "Coapexpan - Tecnica 72",
+    "desc": "Coapexpan - Tecnica 72",
+    "fare": "12.00",
+    "frequency": "15 min"
+  },
+  {
+    "id": 105,
+    "name": "Tecnica 72 - Aguascalientes",
+    "desc": "Tecnica 72 - Aguascalientes",
+    "fare": "12.00",
+    "frequency": "15 min"
+  },
+  {
+    "id": 106,
+    "name": "Fovisste - Lerdo de Tejada",
+    "desc": "Fovisste - Lerdo de Tejada",
+    "fare": "12.00",
+    "frequency": "15 min"
+  },
+  {
+    "id": 107,
+    "name": "Fovissste - IMSS",
+    "desc": "Fovissste - IMSS",
+    "fare": "12.00",
+    "frequency": "15 min"
+  },
+  {
+    "id": 108,
+    "name": "Fovisste-San Bruno - Trancas",
+    "desc": "Fovisste-San Bruno - Trancas",
+    "fare": "12.00",
+    "frequency": "15 min"
+  },
+  {
+    "id": 109,
+    "name": "Pastoresa - Mercado",
+    "desc": "Pastoresa - Mercado",
+    "fare": "12.00",
+    "frequency": "15 min"
+  },
+  {
+    "id": 110,
+    "name": "Luz del Barrio - Plaza Crystal",
+    "desc": "Luz del Barrio - Plaza Crystal",
+    "fare": "12.00",
+    "frequency": "15 min"
+  },
+  {
+    "id": 111,
+    "name": "Rancho Viejo - Xalapa",
+    "desc": "Rancho Viejo - Xalapa",
+    "fare": "12.00",
+    "frequency": "15 min"
+  },
+  {
+    "id": 112,
+    "name": "Mercado - Sumidero",
+    "desc": "Mercado - Sumidero",
+    "fare": "12.00",
+    "frequency": "15 min"
+  },
+  {
+    "id": 113,
+    "name": "Carolino Anaya - IMSS",
+    "desc": "Carolino Anaya - IMSS",
+    "fare": "12.00",
+    "frequency": "15 min"
+  },
+  {
+    "id": 114,
+    "name": "Santa Rosa - Estacion",
+    "desc": "Santa Rosa - Estacion",
+    "fare": "12.00",
+    "frequency": "15 min"
+  },
+  {
+    "id": 115,
+    "name": "Martires de Chicago - Mercado",
+    "desc": "Martires de Chicago - Mercado",
+    "fare": "12.00",
+    "frequency": "15 min"
+  },
+  {
+    "id": 116,
+    "name": "Coapexpan - Sec",
+    "desc": "Coapexpan - Sec",
+    "fare": "12.00",
+    "frequency": "15 min"
+  },
+  {
+    "id": 117,
+    "name": "Coapexpan - Araucarias",
+    "desc": "Coapexpan - Araucarias",
+    "fare": "12.00",
+    "frequency": "15 min"
+  },
+  {
+    "id": 118,
+    "name": "Coapexpan - Araucarias",
+    "desc": "Coapexpan - Araucarias",
+    "fare": "12.00",
+    "frequency": "15 min"
+  },
+  {
+    "id": 119,
+    "name": "Higueras - Mercado",
+    "desc": "Higueras - Mercado",
+    "fare": "12.00",
+    "frequency": "15 min"
+  },
+  {
+    "id": 120,
+    "name": "Circuito Precidentes - Rebsamen -  Xalapa 2000 - Arco Sur - Trancas - Lazaro Cardenas - Ruiz Cortinez - Sauces - Velodromo",
+    "desc": "Circuito Precidentes - Rebsamen -  Xalapa 2000 - Arco Sur - Trancas - Lazaro Cardenas - Ruiz Cortinez - Sauces - Velodromo",
+    "fare": "12.00",
+    "frequency": "15 min"
+  }
+]
