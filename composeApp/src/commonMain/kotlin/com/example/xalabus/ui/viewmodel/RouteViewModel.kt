@@ -28,8 +28,6 @@ class RouteViewModel(
     private val _mapFilePath = MutableStateFlow<String?>(null)
     val mapFilePath: StateFlow<String?> = _mapFilePath
 
-
-
     private val _selectedRoute = MutableStateFlow<RouteEntity?>(null)
     val selectedRoute: StateFlow<RouteEntity?> = _selectedRoute
 
@@ -40,42 +38,60 @@ class RouteViewModel(
     private val _searchQuery = MutableStateFlow("")
     val searchQuery: StateFlow<String> = _searchQuery
 
-    // 2. La lista COMPLETA de rutas que viene de la base de datos
+    // NUEVO: 2. Estado para saber si el orden alfabético está activo
+    private val _isSortedAlphabetically = MutableStateFlow(false)
+    val isSortedAlphabetically: StateFlow<Boolean> = _isSortedAlphabetically
+
+    // 3. La lista COMPLETA de rutas que viene de la base de datos
     private val _allRoutes = MutableStateFlow<List<RouteEntity>>(emptyList())
 
-    // 3. La lista FILTRADA que la vista realmente observa y muestra
+    // 4. La lista FILTRADA que la vista realmente observa y muestra
+    // NUEVO: Agregamos _isSortedAlphabetically al combine
     val filteredRoutes: StateFlow<List<RouteEntity>> = combine(
         _allRoutes,
-        _searchQuery
-    ) { routes, query ->
-        if (query.isBlank()) {
+        _searchQuery,
+        _isSortedAlphabetically
+    ) { routes, query, isSorted ->
+
+        // Primero filtramos por la búsqueda de texto
+        val resultList = if (query.isBlank()) {
             routes
         } else {
-            // 1. Convertimos la búsqueda en "tokens" (palabras individuales)
-            // y quitamos espacios extra.
             val searchTokens = query.trim().split("\\s+".toRegex())
-
             routes.filter { route ->
-                // 2. Verificamos que CADA palabra de la búsqueda esté en el nombre/descripción
                 searchTokens.all { token ->
                     route.id.contains(token, ignoreCase = true) ||
                             route.name.contains(token, ignoreCase = true)
                 }
             }
         }
+
+        // Segundo filtramos por el ordenamiento alfabético
+        if (isSorted) {
+            resultList.sortedBy { it.name }
+        } else {
+            resultList // Si no está activo el botón, se queda en el orden normal
+        }
+
     }.stateIn(
         scope = viewModelScope,
         started = SharingStarted.Lazily,
         initialValue = emptyList()
     )
-    // 4. La función que se llama cada vez que el usuario teclea una letra
+
+    // Función que se llama cada vez que el usuario teclea una letra
     fun onSearchQueryChanged(newQuery: String) {
         _searchQuery.value = newQuery
     }
 
+    // NUEVO: Función para encender/apagar el filtro A-Z
+    fun toggleSortAlphabetically() {
+        _isSortedAlphabetically.value = !_isSortedAlphabetically.value
+    }
+
     @OptIn(ExperimentalResourceApi::class)
-    private val jsonConfig = Json { 
-        ignoreUnknownKeys = true 
+    private val jsonConfig = Json {
+        ignoreUnknownKeys = true
         coerceInputValues = true
     }
 
@@ -89,11 +105,11 @@ class RouteViewModel(
 
                 if (repository.isDatabaseEmpty()) {
                     println("XALABUS_DEBUG: Base de datos vacía, cargando desde index.json...")
-                    
+
                     val indexBytes = Res.readBytes("files/routes/Xalapa/index.json")
                     val indexJson = indexBytes.decodeToString()
                     val index = jsonConfig.decodeFromString<List<com.example.xalabus.data.model.RouteJson>>(indexJson)
-                    
+
                     println("XALABUS_DEBUG: Índice cargado con ${index.size} rutas.")
 
                     index.forEach { indexItem ->

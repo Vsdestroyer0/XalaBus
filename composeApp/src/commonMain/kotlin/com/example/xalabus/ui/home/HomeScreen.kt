@@ -72,42 +72,28 @@ fun HomeScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding)
-        ) {
-            OutlinedTextField(
-                value = searchText,
-                onValueChange = { viewModel.onSearchQueryChanged(it) },
+        ) { val isSorted by viewModel.isSortedAlphabetically.collectAsState()
+            Row(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(horizontal = 16.dp, vertical = 8.dp),
-                textStyle = MaterialTheme.typography.bodyMedium.copy(
-                    fontSize = 14.sp
-                ),
-                placeholder = {
-                    Text(
-                        text = "Buscar ruta o colonia (Ej: Avila Camacho)",
-                        style = MaterialTheme.typography.bodyMedium.copy(
-                            fontSize = 14.sp
-                        )
-                    )
-                },
-                leadingIcon = {
-                    Icon(
-                        imageVector = Icons.Default.Search,
-                        contentDescription = null,
-                        modifier = Modifier.size(20.dp)
-                    )
-                },
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+            OutlinedTextField(
+                value = searchText,
+                onValueChange = { viewModel.onSearchQueryChanged(it) },
+                modifier = Modifier.weight(1f),
+                textStyle = MaterialTheme.typography.bodyMedium.copy(fontSize = 14.sp),
+                placeholder = { Text("Buscar ruta...", style = MaterialTheme.typography.bodyMedium.copy(fontSize = 14.sp)) },
+                leadingIcon = { Icon(Icons.Default.Search, null, Modifier.size(20.dp)) },
                 trailingIcon = {
                     if (searchText.isNotEmpty()) {
                         IconButton(onClick = { viewModel.onSearchQueryChanged("") }) {
-                            Icon(
-                                imageVector = Icons.Default.Clear,
-                                contentDescription = "Limpiar búsqueda",
-                                modifier = Modifier.size(20.dp)
-                            )
+                            Icon(Icons.Default.Clear, "Limpiar", Modifier.size(20.dp))
                         }
                     }
                 },
+
                 shape = RoundedCornerShape(16.dp),
                 singleLine = true,
                 colors = OutlinedTextFieldDefaults.colors(
@@ -115,6 +101,24 @@ fun HomeScreen(
                     unfocusedContainerColor = MaterialTheme.colorScheme.surface,
                 )
             )
+                Spacer(modifier = Modifier.width(8.dp))
+
+                FilledIconToggleButton(
+                    checked = isSorted,
+                    onCheckedChange = { viewModel.toggleSortAlphabetically() },
+                    colors = IconButtonDefaults.filledIconToggleButtonColors(
+                        containerColor = Color.Transparent,
+                        checkedContainerColor = MaterialTheme.colorScheme.primaryContainer,
+                        checkedContentColor = MaterialTheme.colorScheme.onPrimaryContainer
+                    )
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.SortByAlpha,
+                        contentDescription = "Ordenar A-Z"
+                    )
+                }
+            }
+
             Text(
                 text = if (routes.isEmpty() && searchText.isNotEmpty())
                     "No se encontraron rutas para '$searchText'"
