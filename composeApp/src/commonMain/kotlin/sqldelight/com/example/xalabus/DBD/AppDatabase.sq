@@ -1,8 +1,10 @@
 CREATE TABLE RouteEntity (
     id TEXT NOT NULL PRIMARY KEY,
     name TEXT NOT NULL,
-    fare TEXT,        -- Asegúrate que esto exista
-    frequency TEXT     -- Asegúrate que esto exista
+    fare TEXT,
+    fareStudent TEXT,
+    fareInapan TEXT,
+    frequency TEXT
 );
 
 CREATE TABLE GeometryEntity (
@@ -40,7 +42,7 @@ WHERE routeId = ?;
 */
 
 insertRoute:
-INSERT OR REPLACE INTO RouteEntity(id, name, fare, frequency) VALUES (?, ?, ?, ?);
+INSERT OR REPLACE INTO RouteEntity(id, name, fare, fareStudent, fareInapan, frequency) VALUES (?, ?, ?, ?, ?, ?);
 
 insertGeometry:
 INSERT OR REPLACE INTO GeometryEntity(routeId, direction, polyline) VALUES (?, ?, ?);

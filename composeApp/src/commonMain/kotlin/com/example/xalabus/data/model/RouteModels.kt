@@ -8,7 +8,9 @@ data class RouteJson(
     val id: Long,
     val name: String,
     val desc: String? = null,
-    val fare: String? = "$12.00",
+    val fare: String? = "12.00",
+    val fareStudent: String? = "7.00",
+    val fareInapan: String? = "7.00",
     val frequency: String? = "15 min",
     val variants: List<VariantJson> = emptyList()
 )

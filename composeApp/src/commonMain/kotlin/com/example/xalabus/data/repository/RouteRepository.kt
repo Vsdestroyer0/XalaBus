@@ -23,6 +23,8 @@ class RouteRepository(private val db: AppDatabase) {
             id = routeIdStr,
             name = route.desc ?: route.name,
             fare = route.fare ?: "12.00",
+            fareStudent = route.fareStudent ?: "7.00",
+            fareInapan = route.fareInapan ?: "7.00",
             frequency = route.frequency ?: "15 min"
         )
 

@@ -315,21 +315,38 @@ fun MapDetailView(
                 }
 
                 Spacer(Modifier.height(20.dp))
-                Row(
+                // Sección de Tarifas
+                Card(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)),
+                    shape = MaterialTheme.shapes.medium
                 ) {
-                    InfoItem(
-                        icon  = Icons.Default.Payments,
-                        label = "Tarifa",
-                        value = selectedRoute?.fare?.let { if (it.isEmpty()) "N/A" else "\$$it" } ?: "Consultando..."
-                    )
-                    InfoItem(
-                        icon  = Icons.Default.Timer,
-                        label = "Frecuencia",
-                        value = selectedRoute?.frequency?.let { if (it.isEmpty()) "N/A" else it } ?: "Consultando..."
-                    )
+                    Column(modifier = Modifier.padding(12.dp)) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(Icons.Default.Payments, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(20.dp))
+                            Spacer(Modifier.width(8.dp))
+                            Text("Costos de Tarifa", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
+                        }
+                        Spacer(Modifier.height(8.dp))
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            FarePriceItem("General", selectedRoute?.fare ?: "12.00")
+                            FarePriceItem("Estudiantes", selectedRoute?.fareStudent ?: "7.00")
+                            FarePriceItem("INAPAN", selectedRoute?.fareInapan ?: "7.00")
+                        }
+                    }
                 }
+
+                Spacer(Modifier.height(16.dp))
+                
+                // Info adicional (Frecuencia)
+                InfoItem(
+                    icon  = Icons.Default.Timer,
+                    label = "Frecuencia Estimada",
+                    value = selectedRoute?.frequency?.let { if (it.isEmpty()) "N/A" else it } ?: "Consultando..."
+                )
 
                 Spacer(Modifier.height(24.dp))
                 Text("Reportar cambios en la ruta", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onSurface)
@@ -397,5 +414,13 @@ fun InfoItem(icon: androidx.compose.ui.graphics.vector.ImageVector, label: Strin
             Text(label, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             Text(value, style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Medium, color = MaterialTheme.colorScheme.onSurface)
         }
+    }
+}
+
+@Composable
+fun FarePriceItem(label: String, price: String) {
+    Column {
+        Text(label, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Text("$$price", style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
     }
 }
