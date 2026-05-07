@@ -285,7 +285,7 @@ fun MapDetailView(
                 Spacer(Modifier.height(16.dp))
 
                 val formattedId = routeId.padStart(3, '0')
-                val imagePath   = "drawable/bus_$formattedId.jpg"
+                val imagePath   = "files/images/routes/Xalapa/bus_$formattedId.jpg"
                 var imageBitmap by remember(imagePath) { mutableStateOf<ImageBitmap?>(null) }
 
                 LaunchedEffect(imagePath) {
