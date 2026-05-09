@@ -36,7 +36,10 @@ import org.jetbrains.compose.resources.decodeToImageBitmap
 import xalabus.composeapp.generated.resources.*
 import xalabus.composeapp.generated.resources.Res
 
-private enum class AppDestination { AUTH, MAIN, ADMIN_DASHBOARD }
+import com.example.xalabus.ui.profile.ProfileScreen
+import com.example.xalabus.ui.profile.ProfileViewModel
+
+private enum class AppDestination { AUTH, MAIN, ADMIN_DASHBOARD, PROFILE }
 private enum class AuthScreen     { LOGIN, REGISTER }
 
 
@@ -60,6 +63,7 @@ fun App(
     val viewModel      = remember { RouteViewModel(repository, fileManager) }
     val authViewModel  = remember { AuthViewModel() }
     val adminViewModel = remember { AdminViewModel() }
+    val profileViewModel = remember { ProfileViewModel() }
 
     val systemDark  = isSystemInDarkTheme()
     var isDarkMode  by remember { mutableStateOf(systemDark) }
@@ -105,7 +109,8 @@ fun App(
                     onSignOut        = {
                         authViewModel.signOut()
                         isAuthenticated = false
-                    }
+                    },
+                    onNavigateToProfile = { destination = AppDestination.PROFILE }
                 )
 
                 AppDestination.ADMIN_DASHBOARD -> AdminDashboardScreen(
@@ -114,6 +119,11 @@ fun App(
                         adminViewModel.signOut()
                         destination = AppDestination.MAIN
                     }
+                )
+
+                AppDestination.PROFILE -> ProfileScreen(
+                    viewModel = profileViewModel,
+                    onBack = { destination = AppDestination.MAIN }
                 )
             }
         }
@@ -129,7 +139,8 @@ private fun MainAppContent(
     isAuthenticated: Boolean,
     onToggleDarkMode: () -> Unit,
     onSignInRequest: () -> Unit,
-    onSignOut: () -> Unit
+    onSignOut: () -> Unit,
+    onNavigateToProfile: () -> Unit
 ) {
     LaunchedEffect(Unit) { viewModel.initializeData() }
 
@@ -195,6 +206,17 @@ private fun MainAppContent(
                     )
 
                     if (isAuthenticated) {
+                        NavigationDrawerItem(
+                            icon   = { Icon(Icons.Default.Person, contentDescription = null) },
+                            label  = { Text("Mi Perfil") },
+                            selected = false,
+                            onClick  = {
+                                scope.launch { drawerState.close() }
+                                onNavigateToProfile()
+                            },
+                            modifier = Modifier.padding(NavigationDrawerItemDefaults.ItemPadding)
+                        )
+
                         NavigationDrawerItem(
                             icon   = { Icon(Icons.Default.Logout, contentDescription = null) },
                             label  = { Text("Cerrar sesión") },
