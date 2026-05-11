@@ -119,13 +119,6 @@
     "frequency": "15 min"
   },
   {
-    "id": 18,
-    "name": "Ruta 10006",
-    "desc": "Ojo de Agua - Zona UV - El Haya",
-    "fare": "12.00",
-    "frequency": "15 min"
-  },
-  {
     "id": 19,
     "name": "Ruta 10009",
     "desc": "Col. Veracruz - 20 de Noviembre - Central de Abastos",
@@ -171,20 +164,6 @@
     "id": 25,
     "name": "Ruta 10020",
     "desc": "Experimental - Plaza Cristal - Central de Abastos",
-    "fare": "12.00",
-    "frequency": "15 min"
-  },
-  {
-    "id": 26,
-    "name": "Ruta 10019",
-    "desc": "La haciendita - Caxa - Central de Abastos",
-    "fare": "12.00",
-    "frequency": "15 min"
-  },
-  {
-    "id": 27,
-    "name": "Ruta 10020",
-    "desc": "Experimental - Cristal - Central de Abastos",
     "fare": "12.00",
     "frequency": "15 min"
   },
@@ -420,13 +399,6 @@
     "frequency": "15 min"
   },
   {
-    "id": 61,
-    "name": "Ruta 10012",
-    "desc": "Mercado terminal",
-    "fare": "12.00",
-    "frequency": "15 min"
-  },
-  {
     "id": 62,
     "name": "Ruta 10013",
     "desc": "Sumidero - jardines",
@@ -609,13 +581,6 @@
     "frequency": "15 min"
   },
   {
-    "id": 89,
-    "name": "Ruta 2 Buena Vista - Central de Abastos",
-    "desc": "Ruta 2 Buena Vista - Central de Abastos",
-    "fare": "12.00",
-    "frequency": "15 min"
-  },
-  {
     "id": 90,
     "name": "Pastoresa - Murillo Vidal - Centro",
     "desc": "Pastoresa - Murillo Vidal - Centro",
@@ -647,13 +612,6 @@
     "id": 94,
     "name": "Arco Sur - Rebsamen - Tecnológico - Trancas - Lázaro Cárdenas - Pipila - Américas - Avila Camacho - Ignacio de la llave - Sauces - Zona UV",
     "desc": "Arco Sur - Rebsamen - Tecnológico - Trancas - Lázaro Cárdenas - Pipila - Américas - Avila Camacho - Ignacio de la llave - Sauces - Zona UV",
-    "fare": "12.00",
-    "frequency": "15 min"
-  },
-  {
-    "id": 95,
-    "name": "Circuito Lomas Verdes - Medicina",
-    "desc": "Circuito Lomas Verdes - Medicina",
     "fare": "12.00",
     "frequency": "15 min"
   },
@@ -806,13 +764,6 @@
   },
   {
     "id": 117,
-    "name": "Coapexpan - Araucarias",
-    "desc": "Coapexpan - Araucarias",
-    "fare": "12.00",
-    "frequency": "15 min"
-  },
-  {
-    "id": 118,
     "name": "Coapexpan - Araucarias",
     "desc": "Coapexpan - Araucarias",
     "fare": "12.00",
