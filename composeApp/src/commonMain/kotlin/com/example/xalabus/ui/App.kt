@@ -60,6 +60,7 @@ fun App(
     val viewModel      = remember { RouteViewModel(repository, fileManager) }
     val authViewModel  = remember { AuthViewModel() }
     val adminViewModel = remember { AdminViewModel() }
+    val reportsViewModel = remember { com.example.xalabus.ui.viewmodel.ReportsViewModel() }
 
     val systemDark  = isSystemInDarkTheme()
     var isDarkMode  by remember { mutableStateOf(systemDark) }
@@ -105,7 +106,8 @@ fun App(
                     onSignOut        = {
                         authViewModel.signOut()
                         isAuthenticated = false
-                    }
+                    },
+                    reportsViewModel = reportsViewModel
                 )
 
                 AppDestination.ADMIN_DASHBOARD -> AdminDashboardScreen(
@@ -129,13 +131,15 @@ private fun MainAppContent(
     isAuthenticated: Boolean,
     onToggleDarkMode: () -> Unit,
     onSignInRequest: () -> Unit,
-    onSignOut: () -> Unit
+    onSignOut: () -> Unit,
+    reportsViewModel: com.example.xalabus.ui.viewmodel.ReportsViewModel
 ) {
     LaunchedEffect(Unit) { viewModel.initializeData() }
 
     val isLoaded by viewModel.isDataLoaded.collectAsState()
     var showMap by remember { mutableStateOf(false) }
     var showOnboarding by remember { mutableStateOf(!OnboardingPreferences.isOnboardingCompleted()) }
+    var showGeneralReport by remember { mutableStateOf(false) }
 
     val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
     val scope       = rememberCoroutineScope()
@@ -196,6 +200,24 @@ private fun MainAppContent(
 
                     if (isAuthenticated) {
                         NavigationDrawerItem(
+                            icon   = { Icon(Icons.Default.Feedback, contentDescription = null) },
+                            label  = { Text("Reporte General") },
+                            selected = false,
+                            onClick  = {
+                                scope.launch { drawerState.close() }
+                                showGeneralReport = true
+                            },
+                            modifier = Modifier.padding(NavigationDrawerItemDefaults.ItemPadding)
+                        )
+                    }
+
+                    HorizontalDivider(
+                        modifier = Modifier.padding(vertical = 8.dp),
+                        color    = MaterialTheme.colorScheme.outline
+                    )
+
+                    if (isAuthenticated) {
+                        NavigationDrawerItem(
                             icon   = { Icon(Icons.Default.Logout, contentDescription = null) },
                             label  = { Text("Cerrar sesión") },
                             selected = false,
@@ -241,10 +263,18 @@ private fun MainAppContent(
                 MapDetailView(
                     fileManager = fileManager,
                     viewModel   = viewModel,
+                    reportsViewModel = reportsViewModel,
                     isDarkMode  = isDarkMode,
                     onBack      = { showMap = false }
                 )
             }
+        }
+
+        if (showGeneralReport) {
+            com.example.xalabus.ui.reports.GeneralReportDialog(
+                viewModel = reportsViewModel,
+                onDismiss = { showGeneralReport = false }
+            )
         }
     }
 }
@@ -254,12 +284,18 @@ private fun MainAppContent(
 fun MapDetailView(
     fileManager: MapFileManager,
     viewModel: RouteViewModel,
+    reportsViewModel: com.example.xalabus.ui.viewmodel.ReportsViewModel,
     isDarkMode: Boolean,
     onBack: () -> Unit
 ) {
     val selectedRoute  by viewModel.selectedRoute.collectAsState()
     val scaffoldState = rememberBottomSheetScaffoldState()
     val routeId       = selectedRoute?.id ?: ""
+    val parsedRouteId = routeId.toIntOrNull() ?: 0
+
+    var routeReportMessage by remember { mutableStateOf("") }
+    val reportState by reportsViewModel.uiState.collectAsState()
+    var showStopDialog by remember { mutableStateOf(false) }
 
     BottomSheetScaffold(
         scaffoldState       = scaffoldState,
@@ -352,7 +388,8 @@ fun MapDetailView(
                 Text("Reportar cambios en la ruta", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onSurface)
                 Spacer(Modifier.height(8.dp))
                 OutlinedTextField(
-                    value = "", onValueChange = {},
+                    value = routeReportMessage, 
+                    onValueChange = { routeReportMessage = it },
                     placeholder = { Text("Escribe aquí si la ruta cambió...", color = MaterialTheme.colorScheme.onSurfaceVariant) },
                     modifier = Modifier.fillMaxWidth(),
                     shape = MaterialTheme.shapes.medium,
@@ -366,17 +403,50 @@ fun MapDetailView(
                         cursorColor             = MaterialTheme.colorScheme.primary,
                     )
                 )
-                Button(
-                    onClick = {},
-                    modifier = Modifier.align(Alignment.End).padding(top = 8.dp),
-                    colors   = ButtonDefaults.buttonColors(
-                        containerColor = MaterialTheme.colorScheme.primary,
-                        contentColor   = MaterialTheme.colorScheme.onPrimary
-                    )
+                
+                if (reportState is com.example.xalabus.ui.viewmodel.ReportUiState.Error) {
+                    Text((reportState as com.example.xalabus.ui.viewmodel.ReportUiState.Error).message, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.labelSmall)
+                }
+                if (reportState is com.example.xalabus.ui.viewmodel.ReportUiState.Success) {
+                    Text("¡Reporte de ruta enviado!", color = MaterialTheme.colorScheme.primary, style = MaterialTheme.typography.labelSmall)
+                }
+
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Icon(Icons.Default.Send, null, Modifier.size(18.dp))
-                    Spacer(Modifier.width(8.dp))
-                    Text("Enviar Reporte")
+                    TextButton(
+                        onClick = { showStopDialog = true },
+                        colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.secondary)
+                    ) {
+                        Icon(Icons.Default.AddLocationAlt, null, Modifier.size(18.dp))
+                        Spacer(Modifier.width(4.dp))
+                        Text("¡Aquí hay una parada!")
+                    }
+
+                    Button(
+                        onClick = { 
+                            reportsViewModel.submitRouteReport(parsedRouteId, routeReportMessage)
+                            if (reportState is com.example.xalabus.ui.viewmodel.ReportUiState.Success) {
+                                routeReportMessage = ""
+                                reportsViewModel.resetState()
+                            }
+                        },
+                        enabled = routeReportMessage.isNotBlank() && reportState !is com.example.xalabus.ui.viewmodel.ReportUiState.Loading,
+                        colors   = ButtonDefaults.buttonColors(
+                            containerColor = MaterialTheme.colorScheme.primary,
+                            contentColor   = MaterialTheme.colorScheme.onPrimary
+                        )
+                    ) {
+                        if (reportState is com.example.xalabus.ui.viewmodel.ReportUiState.Loading) {
+                            CircularProgressIndicator(modifier = Modifier.size(16.dp), color = MaterialTheme.colorScheme.onPrimary, strokeWidth = 2.dp)
+                        } else {
+                            Icon(Icons.Default.Send, null, Modifier.size(18.dp))
+                            Spacer(Modifier.width(8.dp))
+                            Text("Enviar")
+                        }
+                    }
                 }
                 Spacer(Modifier.height(40.dp))
             }
@@ -393,6 +463,17 @@ fun MapDetailView(
             ) {
                 Icon(Icons.Default.ArrowBack, "Regresar", tint = MaterialTheme.colorScheme.onSurface)
             }
+        }
+        
+        if (showStopDialog) {
+            // TODO: Obtain real map center coordinates from MapLibre
+            com.example.xalabus.ui.reports.RouteStopDialog(
+                viewModel = reportsViewModel,
+                routeId = parsedRouteId,
+                latitude = 19.543, // Default Xalapa coord for now
+                longitude = -96.927,
+                onDismiss = { showStopDialog = false }
+            )
         }
     }
 }
