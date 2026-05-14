@@ -43,6 +43,21 @@ class RouteRepository(private val db: AppDatabase) {
         queries.selectAllRoutes().executeAsList().isEmpty()
     }
 
+    /**
+     * Detecta si la BD tiene datos viejos con nombres tipo "Ruta 10001" (sin desc real).
+     */
+    suspend fun hasStaleData(): Boolean = withContext(Dispatchers.IO) {
+        queries.hasStaleRouteNames().executeAsOne() > 0
+    }
+
+    /**
+     * Borra todas las rutas y geometrías para permitir re-sembrado.
+     */
+    suspend fun clearAllData() = withContext(Dispatchers.IO) {
+        queries.deleteAllGeometries()
+        queries.deleteAllRoutes()
+    }
+
     // --- Consultas ---
 
     fun getAllRoutes() = queries.selectAllRoutes().executeAsList()

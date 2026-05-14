@@ -16,6 +16,43 @@ import kotlinx.coroutines.IO
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.flow.map
+
+/** Normaliza un texto para comparaciones: sin acentos, sin espacios, minúsculas y elimina palabras genéricas. */
+private fun String.normalizeZone(): String {
+    var text = this.trim().lowercase()
+
+    // 1. ELIMINAR TEXTO ENTRE PARÉNTESIS (Borra por completo "(economía)")
+    text = text.replace(Regex("\\(.*?\\)"), "")
+
+    // 2. Quitar signos de puntuación restantes
+    text = text.replace(Regex("[.,;:]"), " ")
+
+    // 3. Reemplazos de acentos y Unicode
+    text = text.replace("á", "a").replace("é", "e").replace("í", "i")
+        .replace("ó", "o").replace("ú", "u").replace("ü", "u")
+        .replace("à", "a").replace("è", "e").replace("ì", "i")
+        .replace("ò", "o").replace("ù", "u")
+        .replace("ǭ", "a").replace("ǭ", "o")
+        .replace("ǘ", "u").replace("ǖ", "u").replace("ǚ", "u").replace("ǜ", "u")
+        .replace("ā", "a").replace("ē", "e").replace("ī", "i").replace("ō", "o").replace("ū", "u")
+        .replace("ă", "a").replace("ĕ", "e").replace("ĭ", "i").replace("ŏ", "o").replace("ŭ", "u")
+        .replace("ã", "a").replace("õ", "o").replace("ñ", "n")
+
+    // 4. Eliminar caracteres no ASCII
+    text = text.map { if (it.code > 127) '?' else it }.joinToString("")
+        .replace("?", "")
+
+    // 5. LIMPIEZA AGRESIVA (La clave para agrupar)
+    // En lugar de estandarizar, ELIMINAMOS las palabras de calle para quedarnos con el nombre puro
+    text = text.replace(Regex("\\b(av|avenida|col|colonia|calle|fracc|fraccionamiento|prolongacion|blvd|bulevar)\\b"), "")
+    
+    // Quitar conectores
+    text = text.replace(Regex("\\b(de|del|las|los|la|el)\\b"), "")
+
+    // 6. Limpieza final de espacios extra
+    return text.replace("\\s+".toRegex(), " ").trim()
+}
 
 class RouteViewModel(
     private val repository: RouteRepository,
@@ -34,9 +71,16 @@ class RouteViewModel(
     private val _selectedRoutePoints = MutableStateFlow<List<List<List<Double>>>>(emptyList())
     val selectedRoutePoints: StateFlow<List<List<List<Double>>>> = _selectedRoutePoints
 
-    // 1. El texto que el usuario escribe en la barra
+    // 1. El texto que el usuario escribe en la barra general
     private val _searchQuery = MutableStateFlow("")
     val searchQuery: StateFlow<String> = _searchQuery
+
+    // NUEVO: Puntos de inicio y fin para filtrar por zonas
+    private val _startZoneQuery = MutableStateFlow("")
+    val startZoneQuery: StateFlow<String> = _startZoneQuery
+
+    private val _endZoneQuery = MutableStateFlow("")
+    val endZoneQuery: StateFlow<String> = _endZoneQuery
 
     // NUEVO: 2. Estado para saber si el orden alfabético está activo
     private val _isSortedAlphabetically = MutableStateFlow(false)
@@ -45,20 +89,60 @@ class RouteViewModel(
     // 3. La lista COMPLETA de rutas que viene de la base de datos
     private val _allRoutes = MutableStateFlow<List<RouteEntity>>(emptyList())
 
+    // Zonas únicas dinámicas extraídas de los nombres de las rutas
+    val uniqueZones: StateFlow<List<String>> = _allRoutes.map { routes ->
+        val seen = mutableSetOf<String>()
+        val unique = mutableListOf<String>()
+
+        val rutaNumPattern = Regex("^ruta\\s+\\d+$", RegexOption.IGNORE_CASE)
+
+        routes.flatMap { route ->
+            route.name.split("-").map { it.trim() }
+        }.filter { it.isNotBlank() }.forEach { rawZone ->
+            
+            // 1. LLAVE SECRETA: Usamos la limpieza agresiva SOLO como llave interna para no repetir 
+            // (Esto junta "Av Xalapa (economía)" con "Avenida Xalapa" bajo la llave secreta "xalapa")
+            val key = rawZone.normalizeZone() 
+            if (key.isBlank() || rutaNumPattern.matches(key)) return@forEach
+            
+            if (seen.add(key)) {
+                // 2. NOMBRE VISUAL: Para mostrar en la lista usamos el texto original
+                // Primero le quitamos cosas feas como "(economía)"
+                var displayName = rawZone.replace(Regex("\\(.*?\\)"), "").trim()
+                
+                // Si alguien lo guardó en la DB como "Av." o "Av", lo ponemos formal como "Avenida"
+                displayName = displayName.replace(Regex("^Av\\.?\\s+", RegexOption.IGNORE_CASE), "Avenida ")
+                
+                // Capitalizamos cada palabra para que se vea muy profesional
+                displayName = displayName.split(" ").joinToString(" ") { word ->
+                    word.replaceFirstChar { it.uppercase() }
+                }
+                
+                unique.add(displayName)
+            }
+        }
+
+        listOf("Mi ubicación") + unique.sorted()
+    }.stateIn(
+        scope = viewModelScope,
+        started = SharingStarted.Lazily,
+        initialValue = emptyList()
+    )
+
     // 4. La lista FILTRADA que la vista realmente observa y muestra
-    // NUEVO: Agregamos _isSortedAlphabetically al combine
     val filteredRoutes: StateFlow<List<RouteEntity>> = combine(
         _allRoutes,
-        _searchQuery,
+        combine(_searchQuery, _startZoneQuery, _endZoneQuery) { q, start, end -> Triple(q, start, end) },
         _isSortedAlphabetically
-    ) { routes, query, isSorted ->
+    ) { routes, queries, isSorted ->
+        val (query, start, end) = queries
+        
+        var resultList = routes
 
-        // Primero filtramos por la búsqueda de texto
-        val resultList = if (query.isBlank()) {
-            routes
-        } else {
+        // Filtro por búsqueda general
+        if (query.isNotBlank()) {
             val searchTokens = query.trim().split("\\s+".toRegex())
-            routes.filter { route ->
+            resultList = resultList.filter { route ->
                 searchTokens.all { token ->
                     route.id.contains(token, ignoreCase = true) ||
                             route.name.contains(token, ignoreCase = true)
@@ -66,11 +150,31 @@ class RouteViewModel(
             }
         }
 
-        // Segundo filtramos por el ordenamiento alfabético
+        // Filtro por zona de inicio (normalizado para ignorar tildes y mayúsculas)
+        if (start.isNotBlank() && start != "Mi ubicación") {
+            val startNorm = start.normalizeZone()
+            resultList = resultList.filter { route ->
+                route.name.split("-").any { segment ->
+                    segment.normalizeZone().contains(startNorm)
+                }
+            }
+        }
+
+        // Filtro por zona de fin (normalizado para ignorar tildes y mayúsculas)
+        if (end.isNotBlank() && end != "Mi ubicación") {
+            val endNorm = end.normalizeZone()
+            resultList = resultList.filter { route ->
+                route.name.split("-").any { segment ->
+                    segment.normalizeZone().contains(endNorm)
+                }
+            }
+        }
+
+        // Ordenamiento alfabético
         if (isSorted) {
             resultList.sortedBy { it.name }
         } else {
-            resultList // Si no está activo el botón, se queda en el orden normal
+            resultList 
         }
 
     }.stateIn(
@@ -79,9 +183,17 @@ class RouteViewModel(
         initialValue = emptyList()
     )
 
-    // Función que se llama cada vez que el usuario teclea una letra
+    // Funciones que se llaman cuando el usuario teclea
     fun onSearchQueryChanged(newQuery: String) {
         _searchQuery.value = newQuery
+    }
+
+    fun onStartZoneQueryChanged(newQuery: String) {
+        _startZoneQuery.value = newQuery
+    }
+
+    fun onEndZoneQueryChanged(newQuery: String) {
+        _endZoneQuery.value = newQuery
     }
 
     // NUEVO: Función para encender/apagar el filtro A-Z
@@ -103,8 +215,16 @@ class RouteViewModel(
                 val mapBytes = Res.readBytes("files/xalapa.mbtiles")
                 val internalPath = fileManager.saveMapFile("xalapa.mbtiles", mapBytes)
 
-                if (repository.isDatabaseEmpty()) {
-                    println("XALABUS_DEBUG: Base de datos vacía, cargando desde index.json...")
+                val isEmpty = repository.isDatabaseEmpty()
+                val isStale = !isEmpty && repository.hasStaleData()
+
+                if (isEmpty || isStale) {
+                    if (isStale) {
+                        println("XALABUS_DEBUG: Datos stale detectados (nombres 'Ruta XXXXX'). Limpiando BD...")
+                        repository.clearAllData()
+                    } else {
+                        println("XALABUS_DEBUG: Base de datos vacía, cargando desde index.json...")
+                    }
 
                     val indexBytes = Res.readBytes("files/routes/Xalapa/index.json")
                     val indexJson = indexBytes.decodeToString()
@@ -119,7 +239,9 @@ class RouteViewModel(
                             val routeData = jsonConfig.decodeFromString<com.example.xalabus.data.model.RouteJson>(routeBytes.decodeToString())
                             repository.insertSingleRoute(routeData)
                         } catch (e: Exception) {
-                            println("XALABUS_DEBUG: Error cargando ruta ${indexItem.id}: ${e.message}")
+                            // Si no hay archivo de ruta individual, insertar solo los metadatos del index
+                            repository.insertSingleRoute(indexItem)
+                            println("XALABUS_DEBUG: Usando datos del index para ruta ${indexItem.id}")
                         }
                     }
                 }
@@ -127,18 +249,9 @@ class RouteViewModel(
                 val allRoutes = repository.getAllRoutes()
                 println("XALABUS_DEBUG: Rutas en DB: ${allRoutes.size}")
 
-                val processedRoutes = allRoutes.map { route ->
-                    val finalName = if (route.name.contains("1000")) {
-                        route.name.substringAfter("-").trim().ifEmpty { route.name }
-                    } else {
-                        route.name
-                    }
-                    route.copy(name = finalName)
-                }
-
                 launch(Dispatchers.Main) {
                     _mapFilePath.value = internalPath
-                    _allRoutes.value = processedRoutes
+                    _allRoutes.value = allRoutes
                     _isDataLoaded.value = true
                 }
 

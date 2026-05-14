@@ -53,3 +53,12 @@ SELECT * FROM GeometryEntity WHERE routeId = ?;
 
 getAllRoutes:
 SELECT * FROM RouteEntity;
+
+deleteAllRoutes:
+DELETE FROM RouteEntity;
+
+deleteAllGeometries:
+DELETE FROM GeometryEntity;
+
+hasStaleRouteNames:
+SELECT COUNT(*) FROM RouteEntity WHERE name LIKE 'Ruta 1%';

@@ -7,6 +7,6 @@ import com.example.xalabus.DBD.AppDatabase
 
 actual class DriverFactory(private val context: Context) {
     actual fun createDriver(): SqlDriver {
-        return AndroidSqliteDriver(AppDatabase.Schema, context, "xalabus.db")
+        return AndroidSqliteDriver(AppDatabase.Schema, context, "xalabus_v2.db")
     }
 }
