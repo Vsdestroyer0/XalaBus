@@ -2,6 +2,7 @@ package com.example.xalabus.ui.admin
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.example.xalabus.core.util.ErrorMapper
 import com.example.xalabus.data.paradas.Parada
 import com.example.xalabus.data.paradas.ParadasRepository
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -85,9 +86,9 @@ class AdminStopViewModel : ViewModel() {
                 )
                 _uiState.value = AdminStopUiState.Success
             } catch (e: Exception) {
-                // Ex-01: error al guardar
+                // Ex-01: traducir con ErrorMapper en lugar de exponer e.message
                 _uiState.value = AdminStopUiState.Error(
-                    "Error al guardar la parada: ${e.message}"
+                    ErrorMapper.toUserMessage(e, "al guardar la parada")
                 )
             }
         }
