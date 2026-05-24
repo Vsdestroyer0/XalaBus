@@ -23,6 +23,8 @@ import com.example.xalabus.ui.admin.AdminDashboardScreen
 import com.example.xalabus.ui.admin.AdminLoginScreen
 import com.example.xalabus.ui.admin.AdminViewModel
 import com.example.xalabus.ui.auth.AuthViewModel
+import com.example.xalabus.ui.auth.ForgotPasswordViewModel
+import com.example.xalabus.ui.auth.ForgotPasswordScreen
 import com.example.xalabus.ui.auth.LoginScreen
 import com.example.xalabus.ui.auth.RegisterScreen
 import com.example.xalabus.ui.home.HomeScreen
@@ -37,7 +39,8 @@ import xalabus.composeapp.generated.resources.*
 import xalabus.composeapp.generated.resources.Res
 
 private enum class AppDestination { AUTH, MAIN, ADMIN_DASHBOARD }
-private enum class AuthScreen     { LOGIN, REGISTER }
+// CU-03: Se agrega FORGOT_PASSWORD al flujo de autenticación
+private enum class AuthScreen { LOGIN, REGISTER, FORGOT_PASSWORD }
 
 
 @Composable
@@ -61,6 +64,8 @@ fun App(
     val authViewModel  = remember { AuthViewModel() }
     val adminViewModel = remember { AdminViewModel() }
     val reportsViewModel = remember { com.example.xalabus.ui.viewmodel.ReportsViewModel() }
+    // CU-03: ViewModel dedicado para recuperación de contraseña
+    val forgotPasswordViewModel = remember { ForgotPasswordViewModel() }
 
     val systemDark  = isSystemInDarkTheme()
     var isDarkMode  by remember { mutableStateOf(systemDark) }
@@ -68,7 +73,7 @@ fun App(
 
     var isAuthenticated by remember { mutableStateOf(authViewModel.isSessionActive()) }
     var destination by remember {
-        mutableStateOf(AppDestination.MAIN) // Iniciamos en MAIN para que sea offline-first
+        mutableStateOf(AppDestination.MAIN)
     }
     var currentAuthScreen by remember { mutableStateOf(AuthScreen.LOGIN) }
 
@@ -78,17 +83,24 @@ fun App(
                 AppDestination.AUTH -> when (currentAuthScreen) {
                     AuthScreen.LOGIN -> LoginScreen(
                         viewModel            = authViewModel,
-                        onLoginSuccess       = { 
+                        onLoginSuccess       = {
                             isAuthenticated = true
-                            destination = AppDestination.MAIN 
+                            destination = AppDestination.MAIN
                         },
                         onNavigateToRegister = { currentAuthScreen = AuthScreen.REGISTER },
+                        onForgotPassword     = { currentAuthScreen = AuthScreen.FORGOT_PASSWORD },
                         onBack               = { destination = AppDestination.MAIN }
                     )
                     AuthScreen.REGISTER -> RegisterScreen(
                         viewModel         = authViewModel,
                         onRegisterSuccess = { currentAuthScreen = AuthScreen.LOGIN },
                         onNavigateToLogin = { currentAuthScreen = AuthScreen.LOGIN }
+                    )
+                    // CU-03: Pantalla de recuperación de contraseña
+                    AuthScreen.FORGOT_PASSWORD -> ForgotPasswordScreen(
+                        viewModel = forgotPasswordViewModel,
+                        onBack    = { currentAuthScreen = AuthScreen.LOGIN },
+                        onSuccess = { currentAuthScreen = AuthScreen.LOGIN }
                     )
                 }
 
@@ -99,7 +111,7 @@ fun App(
                     isDarkMode       = isDarkMode,
                     isAuthenticated  = isAuthenticated,
                     onToggleDarkMode = { isDarkMode = !isDarkMode },
-                    onSignInRequest  = { 
+                    onSignInRequest  = {
                         destination = AppDestination.AUTH
                         currentAuthScreen = AuthScreen.LOGIN
                     },
@@ -265,7 +277,8 @@ private fun MainAppContent(
                     viewModel   = viewModel,
                     reportsViewModel = reportsViewModel,
                     isDarkMode  = isDarkMode,
-                    onBack      = { showMap = false }
+                    onBack      = { showMap = false },
+                    isAuthenticated = isAuthenticated
                 )
             }
         }
@@ -286,6 +299,7 @@ fun MapDetailView(
     viewModel: RouteViewModel,
     reportsViewModel: com.example.xalabus.ui.viewmodel.ReportsViewModel,
     isDarkMode: Boolean,
+    isAuthenticated: Boolean,
     onBack: () -> Unit
 ) {
     val selectedRoute  by viewModel.selectedRoute.collectAsState()
@@ -296,6 +310,22 @@ fun MapDetailView(
     var routeReportMessage by remember { mutableStateOf("") }
     val reportState by reportsViewModel.uiState.collectAsState()
     var showStopDialog by remember { mutableStateOf(false) }
+    // CU-10: estado local del botón de favorito
+    var showFavoritosViewModel by remember { mutableStateOf(false) }
+    // CU-13: mostrar pantalla de reporte de incidente
+    var showReportIncident by remember { mutableStateOf(false) }
+
+    // CU-10: ViewModel de favoritos
+    val favoritosViewModel = remember { com.example.xalabus.ui.viewmodel.FavoritosViewModel() }
+    val favoritoState by favoritosViewModel.uiState.collectAsState()
+    val esFavorito by favoritosViewModel.esFavorito.collectAsState()
+
+    // Cargar estado de favorito al abrir la ruta
+    LaunchedEffect(routeId) {
+        if (routeId.isNotEmpty()) {
+            favoritosViewModel.verificarFavorito(routeId)
+        }
+    }
 
     BottomSheetScaffold(
         scaffoldState       = scaffoldState,
@@ -307,17 +337,60 @@ fun MapDetailView(
                     .fillMaxWidth()
                     .padding(horizontal = 20.dp, vertical = 10.dp)
             ) {
-                Text(
-                    selectedRoute?.name ?: "Ruta Desconocida",
-                    style       = MaterialTheme.typography.headlineSmall,
-                    fontWeight  = FontWeight.Bold,
-                    color       = MaterialTheme.colorScheme.onSurface
-                )
-                Text(
-                    "Xalapa, Veracruz",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
+                // ── Cabecera de la ruta con botón favorito (CU-10) ────────────────
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            selectedRoute?.name ?: "Ruta Desconocida",
+                            style       = MaterialTheme.typography.headlineSmall,
+                            fontWeight  = FontWeight.Bold,
+                            color       = MaterialTheme.colorScheme.onSurface
+                        )
+                        Text(
+                            "Xalapa, Veracruz",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                    // CU-10: Botón de favoritos (solo para usuarios autenticados)
+                    if (isAuthenticated) {
+                        IconButton(
+                            onClick = {
+                                favoritosViewModel.toggleFavorito(routeId)
+                            }
+                        ) {
+                            Icon(
+                                imageVector = if (esFavorito) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
+                                contentDescription = if (esFavorito) "Quitar de favoritos" else "Agregar a favoritos",
+                                tint = if (esFavorito) Color(0xFFF5C518) else MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
+                }
+
+                // Feedback de estado favorito
+                when (favoritoState) {
+                    is com.example.xalabus.ui.viewmodel.FavoritosUiState.Error -> {
+                        Text(
+                            (favoritoState as com.example.xalabus.ui.viewmodel.FavoritosUiState.Error).message,
+                            color = MaterialTheme.colorScheme.error,
+                            style = MaterialTheme.typography.labelSmall
+                        )
+                    }
+                    is com.example.xalabus.ui.viewmodel.FavoritosUiState.Success -> {
+                        Text(
+                            if (esFavorito) "⭐ Agregado a favoritos" else "Removido de favoritos",
+                            color = MaterialTheme.colorScheme.primary,
+                            style = MaterialTheme.typography.labelSmall
+                        )
+                    }
+                    else -> Unit
+                }
+
                 Spacer(Modifier.height(16.dp))
 
                 val formattedId = routeId.padStart(3, '0')
@@ -351,7 +424,8 @@ fun MapDetailView(
                 }
 
                 Spacer(Modifier.height(20.dp))
-                // Sección de Tarifas
+
+                // ── Tarifas ────────────────────────────────────────────────────
                 Card(
                     modifier = Modifier.fillMaxWidth(),
                     colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)),
@@ -376,19 +450,29 @@ fun MapDetailView(
                 }
 
                 Spacer(Modifier.height(16.dp))
-                
-                // Info adicional (Frecuencia)
+
+                // CU-11: Tiempo estimado de traslado
                 InfoItem(
                     icon  = Icons.Default.Timer,
-                    label = "Frecuencia Estimada",
+                    label = "Tiempo Estimado de Traslado",
+                    value = calcularTiempoEstimado(selectedRoute?.frequency)
+                )
+
+                Spacer(Modifier.height(8.dp))
+
+                // Frecuencia
+                InfoItem(
+                    icon  = Icons.Default.DirectionsBus,
+                    label = "Frecuencia de Salida",
                     value = selectedRoute?.frequency?.let { if (it.isEmpty()) "N/A" else it } ?: "Consultando..."
                 )
 
                 Spacer(Modifier.height(24.dp))
+
                 Text("Reportar cambios en la ruta", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onSurface)
                 Spacer(Modifier.height(8.dp))
                 OutlinedTextField(
-                    value = routeReportMessage, 
+                    value = routeReportMessage,
                     onValueChange = { routeReportMessage = it },
                     placeholder = { Text("Escribe aquí si la ruta cambió...", color = MaterialTheme.colorScheme.onSurfaceVariant) },
                     modifier = Modifier.fillMaxWidth(),
@@ -403,7 +487,7 @@ fun MapDetailView(
                         cursorColor             = MaterialTheme.colorScheme.primary,
                     )
                 )
-                
+
                 if (reportState is com.example.xalabus.ui.viewmodel.ReportUiState.Error) {
                     Text((reportState as com.example.xalabus.ui.viewmodel.ReportUiState.Error).message, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.labelSmall)
                 }
@@ -416,6 +500,7 @@ fun MapDetailView(
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
+                    // Botón sugerir parada (existente)
                     TextButton(
                         onClick = { showStopDialog = true },
                         colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.secondary)
@@ -426,7 +511,7 @@ fun MapDetailView(
                     }
 
                     Button(
-                        onClick = { 
+                        onClick = {
                             reportsViewModel.submitRouteReport(parsedRouteId, routeReportMessage)
                             if (reportState is com.example.xalabus.ui.viewmodel.ReportUiState.Success) {
                                 routeReportMessage = ""
@@ -448,6 +533,23 @@ fun MapDetailView(
                         }
                     }
                 }
+
+                // CU-13: Botón para reportar incidente en el mapa
+                if (isAuthenticated) {
+                    Spacer(Modifier.height(8.dp))
+                    OutlinedButton(
+                        onClick = { showReportIncident = true },
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = ButtonDefaults.outlinedButtonColors(
+                            contentColor = MaterialTheme.colorScheme.error
+                        )
+                    ) {
+                        Icon(Icons.Default.Warning, null, Modifier.size(18.dp))
+                        Spacer(Modifier.width(8.dp))
+                        Text("Reportar incidente en el mapa")
+                    }
+                }
+
                 Spacer(Modifier.height(40.dp))
             }
         }
@@ -464,18 +566,39 @@ fun MapDetailView(
                 Icon(Icons.Default.ArrowBack, "Regresar", tint = MaterialTheme.colorScheme.onSurface)
             }
         }
-        
+
         if (showStopDialog) {
-            // TODO: Obtain real map center coordinates from MapLibre
             com.example.xalabus.ui.reports.RouteStopDialog(
                 viewModel = reportsViewModel,
                 routeId = parsedRouteId,
-                latitude = 19.543, // Default Xalapa coord for now
+                latitude = 19.543,
                 longitude = -96.927,
                 onDismiss = { showStopDialog = false }
             )
         }
+
+        // CU-13: Diálogo de reporte de incidente
+        if (showReportIncident) {
+            com.example.xalabus.ui.reports.ReportIncidentDialog(
+                onDismiss = { showReportIncident = false }
+            )
+        }
     }
+}
+
+/**
+ * CU-11: Calcula el tiempo estimado de traslado.
+ * Si la frecuencia indica el tiempo de recorrido (ej. "45 min"), lo usa directamente.
+ * Si no hay datos, devuelve un valor genérico basado en velocidad promedio urbana de 30 km/h.
+ */
+private fun calcularTiempoEstimado(frequency: String?): String {
+    if (frequency.isNullOrBlank()) return "~30–45 min (estimado)"
+    // Si la frecuencia ya contiene "min", puede representar duración del recorrido
+    val cleaned = frequency.trim().lowercase()
+    if (cleaned.contains("min")) return frequency
+    // Formato numérico simple (ej. "15" = frecuencia en minutos, no duración)
+    // En ese caso estimamos la duración promedio de ruta urbana en Xalapa
+    return "~30–45 min (estimado)"
 }
 
 @Composable

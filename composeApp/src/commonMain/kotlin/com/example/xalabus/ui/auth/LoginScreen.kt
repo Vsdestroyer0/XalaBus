@@ -21,7 +21,7 @@ import androidx.compose.ui.text.input.*
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
-// ── Paleta XalaBus Dark ─────────────────────────────────────────────────────
+// ── Paleta XalaBus Dark ──────────────────────────────────────────────
 private val XalaBg      = Color(0xFF0A0A0A)
 private val XalaSurface = Color(0xFF161616)
 private val XalaAccent  = Color(0xFFF5C518)
@@ -35,6 +35,8 @@ fun LoginScreen(
     viewModel: AuthViewModel,
     onLoginSuccess: () -> Unit,
     onNavigateToRegister: () -> Unit,
+    // CU-03: callback para navegar a recuperación de contraseña
+    onForgotPassword: () -> Unit,
     onBack: () -> Unit
 ) {
     val uiState by viewModel.uiState.collectAsState()
@@ -87,7 +89,7 @@ fun LoginScreen(
 
             Spacer(Modifier.height(32.dp))
 
-            // ── Ícono de marca ──────────────────────────────────────────────
+            // ── Ícono de marca ─────────────────────────────────────────────
             Box(
                 modifier = Modifier
                     .size(56.dp)
@@ -127,7 +129,7 @@ fun LoginScreen(
 
             Spacer(Modifier.height(48.dp))
 
-            // ── Campo Email ─────────────────────────────────────────────────
+            // ── Campo Email ───────────────────────────────────────────────
             OutlinedTextField(
                 value = email,
                 onValueChange = { email = it },
@@ -180,9 +182,19 @@ fun LoginScreen(
                 )
             }
 
-            Spacer(Modifier.height(32.dp))
+            // CU-03: Link de recuperación de contraseña
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
+                horizontalArrangement = Arrangement.End
+            ) {
+                TextButton(onClick = onForgotPassword) {
+                    Text("¿Olvidaste tu contraseña?", color = XalaAccent, fontSize = 13.sp)
+                }
+            }
 
-            // ── Botón Entrar ────────────────────────────────────────────────
+            Spacer(Modifier.height(20.dp))
+
+            // ── Botón Entrar ───────────────────────────────────────────────
             Button(
                 onClick = {
                     focusManager.clearFocus()
@@ -202,7 +214,7 @@ fun LoginScreen(
 
             Spacer(Modifier.height(20.dp))
 
-            // ── Registro ────────────────────────────────────────────────────
+            // ── Registro ───────────────────────────────────────────────────
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.Center,
