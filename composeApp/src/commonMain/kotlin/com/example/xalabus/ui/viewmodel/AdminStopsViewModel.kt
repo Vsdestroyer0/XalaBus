@@ -2,6 +2,7 @@ package com.example.xalabus.ui.viewmodel
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.example.xalabus.core.util.ErrorMapper
 import com.example.xalabus.data.reports.ReportsRepository
 import com.example.xalabus.data.reports.RouteStop
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -32,7 +33,9 @@ class AdminStopsViewModel : ViewModel() {
                 val stops = repository.getPendingStops()
                 _uiState.value = AdminStopsUiState.Success(stops)
             } catch (e: Exception) {
-                _uiState.value = AdminStopsUiState.Error("Error al cargar paradas: ${e.message}")
+                _uiState.value = AdminStopsUiState.Error(
+                    ErrorMapper.toUserMessage(e, "al cargar las paradas")
+                )
             }
         }
     }
@@ -44,7 +47,9 @@ class AdminStopsViewModel : ViewModel() {
                 // Refrescar la lista despues de actualizar
                 fetchPendingStops()
             } catch (e: Exception) {
-                _uiState.value = AdminStopsUiState.Error("Error al actualizar parada: ${e.message}")
+                _uiState.value = AdminStopsUiState.Error(
+                    ErrorMapper.toUserMessage(e, "al actualizar la parada")
+                )
             }
         }
     }
