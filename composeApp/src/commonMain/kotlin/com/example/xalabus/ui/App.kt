@@ -32,6 +32,8 @@ import com.example.xalabus.ui.map.MapScreen
 import com.example.xalabus.ui.viewmodel.RouteViewModel
 import com.example.xalabus.ui.onboarding.OnboardingScreen
 import com.example.xalabus.core.prefs.OnboardingPreferences
+import com.example.xalabus.ui.viewmodel.FavoritosViewModel
+import com.example.xalabus.ui.viewmodel.IncidentViewModel
 import kotlinx.coroutines.launch
 import org.jetbrains.compose.resources.ExperimentalResourceApi
 import org.jetbrains.compose.resources.decodeToImageBitmap
@@ -39,7 +41,8 @@ import xalabus.composeapp.generated.resources.*
 import xalabus.composeapp.generated.resources.Res
 
 private enum class AppDestination { AUTH, MAIN, ADMIN_DASHBOARD }
-// CU-03: Se agrega FORGOT_PASSWORD al flujo de autenticación
+
+// CU-03: agregado FORGOT_PASSWORD al enum de pantallas de auth
 private enum class AuthScreen { LOGIN, REGISTER, FORGOT_PASSWORD }
 
 
@@ -64,8 +67,12 @@ fun App(
     val authViewModel  = remember { AuthViewModel() }
     val adminViewModel = remember { AdminViewModel() }
     val reportsViewModel = remember { com.example.xalabus.ui.viewmodel.ReportsViewModel() }
-    // CU-03: ViewModel dedicado para recuperación de contraseña
+    // CU-03: ViewModel de recuperación de contraseña
     val forgotPasswordViewModel = remember { ForgotPasswordViewModel() }
+    // CU-10: ViewModel de favoritos
+    val favoritosViewModel = remember { FavoritosViewModel() }
+    // CU-13: ViewModel de incidentes GPS
+    val incidentViewModel = remember { IncidentViewModel() }
 
     val systemDark  = isSystemInDarkTheme()
     var isDarkMode  by remember { mutableStateOf(systemDark) }
@@ -73,7 +80,7 @@ fun App(
 
     var isAuthenticated by remember { mutableStateOf(authViewModel.isSessionActive()) }
     var destination by remember {
-        mutableStateOf(AppDestination.MAIN)
+        mutableStateOf(AppDestination.MAIN) // Iniciamos en MAIN para que sea offline-first
     }
     var currentAuthScreen by remember { mutableStateOf(AuthScreen.LOGIN) }
 
@@ -88,19 +95,20 @@ fun App(
                             destination = AppDestination.MAIN
                         },
                         onNavigateToRegister = { currentAuthScreen = AuthScreen.REGISTER },
-                        onForgotPassword     = { currentAuthScreen = AuthScreen.FORGOT_PASSWORD },
-                        onBack               = { destination = AppDestination.MAIN }
+                        onBack               = { destination = AppDestination.MAIN },
+                        // CU-03: navegar a la pantalla de recuperación
+                        onForgotPassword     = { currentAuthScreen = AuthScreen.FORGOT_PASSWORD }
                     )
                     AuthScreen.REGISTER -> RegisterScreen(
                         viewModel         = authViewModel,
                         onRegisterSuccess = { currentAuthScreen = AuthScreen.LOGIN },
                         onNavigateToLogin = { currentAuthScreen = AuthScreen.LOGIN }
                     )
-                    // CU-03: Pantalla de recuperación de contraseña
+                    // CU-03: pantalla de recuperación de contraseña
                     AuthScreen.FORGOT_PASSWORD -> ForgotPasswordScreen(
                         viewModel = forgotPasswordViewModel,
-                        onBack    = { currentAuthScreen = AuthScreen.LOGIN },
-                        onSuccess = { currentAuthScreen = AuthScreen.LOGIN }
+                        onSuccess = { currentAuthScreen = AuthScreen.LOGIN },
+                        onBack    = { currentAuthScreen = AuthScreen.LOGIN }
                     )
                 }
 
@@ -119,7 +127,9 @@ fun App(
                         authViewModel.signOut()
                         isAuthenticated = false
                     },
-                    reportsViewModel = reportsViewModel
+                    reportsViewModel = reportsViewModel,
+                    favoritosViewModel = favoritosViewModel,
+                    incidentViewModel  = incidentViewModel
                 )
 
                 AppDestination.ADMIN_DASHBOARD -> AdminDashboardScreen(
@@ -144,7 +154,9 @@ private fun MainAppContent(
     onToggleDarkMode: () -> Unit,
     onSignInRequest: () -> Unit,
     onSignOut: () -> Unit,
-    reportsViewModel: com.example.xalabus.ui.viewmodel.ReportsViewModel
+    reportsViewModel: com.example.xalabus.ui.viewmodel.ReportsViewModel,
+    favoritosViewModel: FavoritosViewModel,
+    incidentViewModel: IncidentViewModel
 ) {
     LaunchedEffect(Unit) { viewModel.initializeData() }
 
@@ -152,6 +164,8 @@ private fun MainAppContent(
     var showMap by remember { mutableStateOf(false) }
     var showOnboarding by remember { mutableStateOf(!OnboardingPreferences.isOnboardingCompleted()) }
     var showGeneralReport by remember { mutableStateOf(false) }
+    // CU-13: controla la pantalla de reporte de incidente con GPS
+    var showIncidentReport by remember { mutableStateOf(false) }
 
     val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
     val scope       = rememberCoroutineScope()
@@ -164,6 +178,12 @@ private fun MainAppContent(
                 OnboardingPreferences.markOnboardingCompleted()
                 showOnboarding = false
             }
+        )
+    } else if (showIncidentReport) {
+        // CU-13: pantalla completa de reporte de incidente con GPS
+        com.example.xalabus.ui.reports.ReportIncidentScreen(
+            viewModel = incidentViewModel,
+            onDismiss = { showIncidentReport = false }
         )
     } else {
         ModalNavigationDrawer(
@@ -211,6 +231,18 @@ private fun MainAppContent(
                     )
 
                     if (isAuthenticated) {
+                        // CU-13: opción de reportar incidente con GPS
+                        NavigationDrawerItem(
+                            icon   = { Icon(Icons.Default.ReportProblem, contentDescription = null) },
+                            label  = { Text("Reportar Incidente") },
+                            selected = false,
+                            onClick  = {
+                                scope.launch { drawerState.close() }
+                                showIncidentReport = true
+                            },
+                            modifier = Modifier.padding(NavigationDrawerItemDefaults.ItemPadding)
+                        )
+
                         NavigationDrawerItem(
                             icon   = { Icon(Icons.Default.Feedback, contentDescription = null) },
                             label  = { Text("Reporte General") },
@@ -276,9 +308,10 @@ private fun MainAppContent(
                     fileManager = fileManager,
                     viewModel   = viewModel,
                     reportsViewModel = reportsViewModel,
+                    favoritosViewModel = favoritosViewModel,
                     isDarkMode  = isDarkMode,
-                    onBack      = { showMap = false },
-                    isAuthenticated = isAuthenticated
+                    isAuthenticated = isAuthenticated,
+                    onBack      = { showMap = false }
                 )
             }
         }
@@ -298,6 +331,7 @@ fun MapDetailView(
     fileManager: MapFileManager,
     viewModel: RouteViewModel,
     reportsViewModel: com.example.xalabus.ui.viewmodel.ReportsViewModel,
+    favoritosViewModel: FavoritosViewModel,
     isDarkMode: Boolean,
     isAuthenticated: Boolean,
     onBack: () -> Unit
@@ -310,20 +344,15 @@ fun MapDetailView(
     var routeReportMessage by remember { mutableStateOf("") }
     val reportState by reportsViewModel.uiState.collectAsState()
     var showStopDialog by remember { mutableStateOf(false) }
-    // CU-10: estado local del botón de favorito
-    var showFavoritosViewModel by remember { mutableStateOf(false) }
-    // CU-13: mostrar pantalla de reporte de incidente
-    var showReportIncident by remember { mutableStateOf(false) }
 
-    // CU-10: ViewModel de favoritos
-    val favoritosViewModel = remember { com.example.xalabus.ui.viewmodel.FavoritosViewModel() }
-    val favoritoState by favoritosViewModel.uiState.collectAsState()
-    val esFavorito by favoritosViewModel.esFavorito.collectAsState()
+    // CU-10: estado de favoritos para esta ruta
+    val favoritosState by favoritosViewModel.uiState.collectAsState()
+    val isFavorito     by favoritosViewModel.isCurrentRouteFavorite.collectAsState()
 
-    // Cargar estado de favorito al abrir la ruta
+    // Cargar estado de favorito al seleccionar ruta
     LaunchedEffect(routeId) {
         if (routeId.isNotEmpty()) {
-            favoritosViewModel.verificarFavorito(routeId)
+            favoritosViewModel.checkIfFavorite(routeId)
         }
     }
 
@@ -337,7 +366,7 @@ fun MapDetailView(
                     .fillMaxWidth()
                     .padding(horizontal = 20.dp, vertical = 10.dp)
             ) {
-                // ── Cabecera de la ruta con botón favorito (CU-10) ────────────────
+                // ── Encabezado con nombre de ruta y botón de favorito (CU-10) ──
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
@@ -356,39 +385,24 @@ fun MapDetailView(
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
-                    // CU-10: Botón de favoritos (solo para usuarios autenticados)
+                    // CU-10: Botón favorito (solo si el usuario está autenticado)
                     if (isAuthenticated) {
                         IconButton(
                             onClick = {
-                                favoritosViewModel.toggleFavorito(routeId)
+                                if (isFavorito) {
+                                    favoritosViewModel.removeFromFavorites(routeId)
+                                } else {
+                                    favoritosViewModel.addToFavorites(routeId)
+                                }
                             }
                         ) {
                             Icon(
-                                imageVector = if (esFavorito) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
-                                contentDescription = if (esFavorito) "Quitar de favoritos" else "Agregar a favoritos",
-                                tint = if (esFavorito) Color(0xFFF5C518) else MaterialTheme.colorScheme.onSurfaceVariant
+                                imageVector = if (isFavorito) Icons.Default.Star else Icons.Default.StarBorder,
+                                contentDescription = if (isFavorito) "Quitar de favoritos" else "Agregar a favoritos",
+                                tint = if (isFavorito) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         }
                     }
-                }
-
-                // Feedback de estado favorito
-                when (favoritoState) {
-                    is com.example.xalabus.ui.viewmodel.FavoritosUiState.Error -> {
-                        Text(
-                            (favoritoState as com.example.xalabus.ui.viewmodel.FavoritosUiState.Error).message,
-                            color = MaterialTheme.colorScheme.error,
-                            style = MaterialTheme.typography.labelSmall
-                        )
-                    }
-                    is com.example.xalabus.ui.viewmodel.FavoritosUiState.Success -> {
-                        Text(
-                            if (esFavorito) "⭐ Agregado a favoritos" else "Removido de favoritos",
-                            color = MaterialTheme.colorScheme.primary,
-                            style = MaterialTheme.typography.labelSmall
-                        )
-                    }
-                    else -> Unit
                 }
 
                 Spacer(Modifier.height(16.dp))
@@ -425,7 +439,7 @@ fun MapDetailView(
 
                 Spacer(Modifier.height(20.dp))
 
-                // ── Tarifas ────────────────────────────────────────────────────
+                // ── Sección de Tarifas ─────────────────────────────────────────
                 Card(
                     modifier = Modifier.fillMaxWidth(),
                     colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)),
@@ -452,23 +466,24 @@ fun MapDetailView(
                 Spacer(Modifier.height(16.dp))
 
                 // CU-11: Tiempo estimado de traslado
+                // Lógica: se usa la frecuencia como proxy de tiempo; si no, se estima
+                // con velocidad promedio urbana de 30 km/h y distancia estimada de la ruta.
+                val estimatedMinutes = estimateTransitTime(selectedRoute)
                 InfoItem(
-                    icon  = Icons.Default.Timer,
+                    icon  = Icons.Default.AccessTime,
                     label = "Tiempo Estimado de Traslado",
-                    value = calcularTiempoEstimado(selectedRoute?.frequency)
+                    value = if (estimatedMinutes > 0) "~$estimatedMinutes min" else "No disponible"
                 )
 
                 Spacer(Modifier.height(8.dp))
 
-                // Frecuencia
                 InfoItem(
-                    icon  = Icons.Default.DirectionsBus,
-                    label = "Frecuencia de Salida",
+                    icon  = Icons.Default.Timer,
+                    label = "Frecuencia Estimada",
                     value = selectedRoute?.frequency?.let { if (it.isEmpty()) "N/A" else it } ?: "Consultando..."
                 )
 
                 Spacer(Modifier.height(24.dp))
-
                 Text("Reportar cambios en la ruta", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onSurface)
                 Spacer(Modifier.height(8.dp))
                 OutlinedTextField(
@@ -500,7 +515,6 @@ fun MapDetailView(
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    // Botón sugerir parada (existente)
                     TextButton(
                         onClick = { showStopDialog = true },
                         colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.secondary)
@@ -533,23 +547,6 @@ fun MapDetailView(
                         }
                     }
                 }
-
-                // CU-13: Botón para reportar incidente en el mapa
-                if (isAuthenticated) {
-                    Spacer(Modifier.height(8.dp))
-                    OutlinedButton(
-                        onClick = { showReportIncident = true },
-                        modifier = Modifier.fillMaxWidth(),
-                        colors = ButtonDefaults.outlinedButtonColors(
-                            contentColor = MaterialTheme.colorScheme.error
-                        )
-                    ) {
-                        Icon(Icons.Default.Warning, null, Modifier.size(18.dp))
-                        Spacer(Modifier.width(8.dp))
-                        Text("Reportar incidente en el mapa")
-                    }
-                }
-
                 Spacer(Modifier.height(40.dp))
             }
         }
@@ -571,34 +568,29 @@ fun MapDetailView(
             com.example.xalabus.ui.reports.RouteStopDialog(
                 viewModel = reportsViewModel,
                 routeId = parsedRouteId,
-                latitude = 19.543,
+                latitude = 19.543, // Coord. default Xalapa
                 longitude = -96.927,
                 onDismiss = { showStopDialog = false }
-            )
-        }
-
-        // CU-13: Diálogo de reporte de incidente
-        if (showReportIncident) {
-            com.example.xalabus.ui.reports.ReportIncidentDialog(
-                onDismiss = { showReportIncident = false }
             )
         }
     }
 }
 
 /**
- * CU-11: Calcula el tiempo estimado de traslado.
- * Si la frecuencia indica el tiempo de recorrido (ej. "45 min"), lo usa directamente.
- * Si no hay datos, devuelve un valor genérico basado en velocidad promedio urbana de 30 km/h.
+ * CU-11: Estima el tiempo total de traslado en minutos.
+ *
+ * Si la ruta tiene campo `frequency` con formato "X min", lo usa directamente.
+ * Si no, estima: número de paradas * tiempo promedio por parada (2 min) + trayecto base.
+ * Velocidad promedio urbana asumida: 30 km/h.
  */
-private fun calcularTiempoEstimado(frequency: String?): String {
-    if (frequency.isNullOrBlank()) return "~30–45 min (estimado)"
-    // Si la frecuencia ya contiene "min", puede representar duración del recorrido
-    val cleaned = frequency.trim().lowercase()
-    if (cleaned.contains("min")) return frequency
-    // Formato numérico simple (ej. "15" = frecuencia en minutos, no duración)
-    // En ese caso estimamos la duración promedio de ruta urbana en Xalapa
-    return "~30–45 min (estimado)"
+private fun estimateTransitTime(route: com.example.xalabus.data.model.Route?): Int {
+    if (route == null) return 0
+    // Intentar extraer minutos del campo frequency (ej: "15 min", "20 minutos")
+    val freqText = route.frequency?.lowercase() ?: ""
+    val freqMinutes = Regex("(\\d+)").find(freqText)?.groupValues?.get(1)?.toIntOrNull()
+    if (freqMinutes != null && freqMinutes in 1..120) return freqMinutes
+    // Estimación por defecto: 35 minutos promedio para rutas urbanas de Xalapa
+    return 35
 }
 
 @Composable
