@@ -2,6 +2,7 @@ package com.example.xalabus.ui.reports
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.example.xalabus.core.util.ErrorMapper
 import com.example.xalabus.data.SupabaseClientProvider
 import com.example.xalabus.data.reportes.Reporte
 import com.example.xalabus.data.reportes.ReportesRepository
@@ -44,7 +45,7 @@ class ReportViewModel : ViewModel() {
     val uiState: StateFlow<ReportUiState> = _uiState.asStateFlow()
 
     private val _selectedPoint = MutableStateFlow<MapPoint?>(null)
-    val selectedPoint: StateFlow<MapPoint?> = _selectedPoint.asStateFlow()
+    val selectedPoint: StateFlow<MapPoint?> = _selectedPoint
 
     /** Establece el punto seleccionado por el usuario en el mapa */
     fun setMapPoint(latitud: Double, longitud: Double) {
@@ -99,9 +100,9 @@ class ReportViewModel : ViewModel() {
                 _uiState.value = ReportUiState.Success
                 _selectedPoint.value = null
             } catch (e: Exception) {
-                // Ex-01
+                // Ex-01: traducir con ErrorMapper en lugar de exponer e.message
                 _uiState.value = ReportUiState.Error(
-                    "Error al enviar el reporte: ${e.message}"
+                    ErrorMapper.toUserMessage(e, "al enviar el reporte")
                 )
             }
         }
