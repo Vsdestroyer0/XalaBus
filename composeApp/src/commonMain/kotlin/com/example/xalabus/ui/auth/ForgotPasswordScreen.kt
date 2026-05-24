@@ -27,13 +27,17 @@ import androidx.compose.ui.unit.dp
  *
  * Flujo en 3 pasos:
  *  1. Ingresar correo → envío del código OTP
- *  2. Ingresar código OTP de 6 dígitos
+ *  2. Ingresar código OTP (longitud configurable por Supabase, actualmente 8 dígitos)
  *  3. Ingresar y confirmar nueva contraseña
  *
  * FA-01: correo no encontrado → mensaje de error en UI
  * FA-02: código inválido       → mensaje de error en UI
  * Ex-01: error de red          → mensaje de error en UI
  */
+
+// Longitud del OTP enviado por Supabase. Si se cambia en el Dashboard, actualizar aquí.
+private const val OTP_LENGTH = 8
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ForgotPasswordScreen(
@@ -169,15 +173,17 @@ fun ForgotPasswordScreen(
                                 fontWeight = FontWeight.Bold
                             )
                             Text(
-                                "Revisa tu correo e ingresa el código de 6 dígitos.",
+                                // Texto actualizado para reflejar los 8 dígitos reales
+                                "Revisa tu correo e ingresa el código de $OTP_LENGTH dígitos.",
                                 style = MaterialTheme.typography.bodyMedium,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
 
                             OutlinedTextField(
                                 value         = otp,
-                                onValueChange = { if (it.length <= 6) otp = it },
-                                label         = { Text("Código de verificación") },
+                                // fix: maxLength ajustado a OTP_LENGTH (8) en lugar de 6
+                                onValueChange = { if (it.length <= OTP_LENGTH) otp = it },
+                                label         = { Text("Código de verificación ($OTP_LENGTH dígitos)") },
                                 modifier      = Modifier.fillMaxWidth(),
                                 keyboardOptions = KeyboardOptions(
                                     keyboardType = KeyboardType.Number,
@@ -191,7 +197,9 @@ fun ForgotPasswordScreen(
 
                             Button(
                                 onClick  = { viewModel.verifyOtp(otp) },
-                                modifier = Modifier.fillMaxWidth()
+                                modifier = Modifier.fillMaxWidth(),
+                                // Habilitar solo cuando se hayan ingresado todos los dígitos
+                                enabled  = otp.length == OTP_LENGTH
                             ) { Text("Verificar código") }
 
                             TextButton(onClick = { viewModel.sendRecoveryEmail(email) }) {
