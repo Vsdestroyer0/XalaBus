@@ -27,6 +27,7 @@ import com.example.xalabus.ui.auth.ForgotPasswordViewModel
 import com.example.xalabus.ui.auth.ForgotPasswordScreen
 import com.example.xalabus.ui.auth.LoginScreen
 import com.example.xalabus.ui.auth.RegisterScreen
+import com.example.xalabus.ui.home.FavoritosScreen
 import com.example.xalabus.ui.home.HomeScreen
 import com.example.xalabus.ui.map.MapScreen
 import com.example.xalabus.ui.viewmodel.RouteViewModel
@@ -166,6 +167,8 @@ private fun MainAppContent(
     var showGeneralReport by remember { mutableStateOf(false) }
     // CU-13: controla la pantalla de reporte de incidente con GPS
     var showIncidentReport by remember { mutableStateOf(false) }
+    // CU-10 (extensión): controla la pantalla de rutas favoritas del drawer
+    var showFavoritos by remember { mutableStateOf(false) }
 
     val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
     val scope       = rememberCoroutineScope()
@@ -184,6 +187,19 @@ private fun MainAppContent(
         com.example.xalabus.ui.reports.ReportIncidentScreen(
             viewModel = incidentViewModel,
             onDismiss = { showIncidentReport = false }
+        )
+    } else if (showFavoritos) {
+        // CU-10 (extensión): pantalla completa de rutas favoritas del usuario
+        FavoritosScreen(
+            favoritosViewModel = favoritosViewModel,
+            routeViewModel     = viewModel,
+            onNavigateToRoute  = { routeId ->
+                // Seleccionar ruta y abrir el mapa directamente
+                viewModel.selectRoute(routeId)
+                showFavoritos = false
+                showMap = true
+            },
+            onDismiss = { showFavoritos = false }
         )
     } else {
         ModalNavigationDrawer(
@@ -230,7 +246,27 @@ private fun MainAppContent(
                         color    = MaterialTheme.colorScheme.outline
                     )
 
+                    // ─────────────────────────────────────────────
+                    // Opciones exclusivas para usuarios autenticados
+                    // ─────────────────────────────────────────────
                     if (isAuthenticated) {
+
+                        // CU-10 (extensión): ver rutas favoritas guardadas
+                        NavigationDrawerItem(
+                            icon     = { Icon(Icons.Default.Star, contentDescription = null) },
+                            label    = { Text("Mis Rutas Favoritas") },
+                            selected = false,
+                            onClick  = {
+                                scope.launch { drawerState.close() }
+                                showFavoritos = true
+                            },
+                            colors = NavigationDrawerItemDefaults.colors(
+                                unselectedTextColor = MaterialTheme.colorScheme.primary,
+                                unselectedIconColor = MaterialTheme.colorScheme.primary
+                            ),
+                            modifier = Modifier.padding(NavigationDrawerItemDefaults.ItemPadding)
+                        )
+
                         // CU-13: opción de reportar incidente con GPS
                         NavigationDrawerItem(
                             icon   = { Icon(Icons.Default.ReportProblem, contentDescription = null) },
@@ -439,7 +475,7 @@ fun MapDetailView(
 
                 Spacer(Modifier.height(20.dp))
 
-                // ── Sección de Tarifas ─────────────────────────────────────────
+                // ── Sección de Tarifas ──────────────────────────────────────────
                 Card(
                     modifier = Modifier.fillMaxWidth(),
                     colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)),
