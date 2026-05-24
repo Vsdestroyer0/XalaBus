@@ -11,7 +11,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 
-/** Estados posibles de las operaciones de favoritos (CU-10) */
+/** Estados de la operación de favoritos (CU-10) */
 sealed class FavoritosUiState {
     object Idle : FavoritosUiState()
     object Loading : FavoritosUiState()
@@ -19,12 +19,6 @@ sealed class FavoritosUiState {
     data class Error(val message: String) : FavoritosUiState()
 }
 
-/**
- * CU-10: ViewModel para guardar y gestionar rutas favoritas del usuario.
- * Expone:
- * - [uiState]: estado general de la operación (Idle/Loading/Success/Error)
- * - [isCurrentRouteFavorite]: si la ruta actualmente seleccionada está en favoritos
- */
 class FavoritosViewModel : ViewModel() {
 
     private val repository = FavoritosRepository()
@@ -33,36 +27,38 @@ class FavoritosViewModel : ViewModel() {
     private val _uiState = MutableStateFlow<FavoritosUiState>(FavoritosUiState.Idle)
     val uiState: StateFlow<FavoritosUiState> = _uiState.asStateFlow()
 
+    /** Indica si la ruta actual ya está en favoritos del usuario */
     private val _isCurrentRouteFavorite = MutableStateFlow(false)
     val isCurrentRouteFavorite: StateFlow<Boolean> = _isCurrentRouteFavorite.asStateFlow()
 
-    /** Devuelve el userId del usuario autenticado, o null si no hay sesión */
-    private fun currentUserId(): String? =
+    /** Obtiene el userId de la sesión activa, o null si no hay sesión */
+    private fun getCurrentUserId(): String? =
         supabase.auth.currentSessionOrNull()?.user?.id
 
     /**
-     * Verifica si la [routeId] dada ya está en favoritos del usuario actual.
-     * Actualiza [isCurrentRouteFavorite] en consecuencia.
+     * CU-10 — Verifica si la ruta ya está en favoritos.
+     * Llamar al seleccionar una ruta en MapDetailView.
      */
     fun checkIfFavorite(routeId: String) {
-        val userId = currentUserId() ?: return
+        val userId = getCurrentUserId() ?: run {
+            _isCurrentRouteFavorite.value = false
+            return
+        }
         viewModelScope.launch {
             try {
                 _isCurrentRouteFavorite.value = repository.isFavorito(userId, routeId)
             } catch (e: Exception) {
-                // Falla silenciosa: el botón mostrará estado "no favorito" por defecto
                 _isCurrentRouteFavorite.value = false
             }
         }
     }
 
     /**
-     * CU-10 flujo principal: Agrega [routeId] a la lista de favoritos del usuario.
-     * Ex-01: error al guardar → estado Error con mensaje.
+     * CU-10 — Agrega la ruta a favoritos (guardado persistente en Supabase).
+     * Ex-01: error al guardar → estado Error.
      */
     fun addToFavorites(routeId: String) {
-        val userId = currentUserId()
-        if (userId == null) {
+        val userId = getCurrentUserId() ?: run {
             _uiState.value = FavoritosUiState.Error("Debes iniciar sesión para guardar favoritos.")
             return
         }
@@ -81,15 +77,10 @@ class FavoritosViewModel : ViewModel() {
     }
 
     /**
-     * Elimina [routeId] de los favoritos del usuario.
-     * Ex-01: error al eliminar → estado Error con mensaje.
+     * CU-10 — Elimina la ruta de favoritos.
      */
     fun removeFromFavorites(routeId: String) {
-        val userId = currentUserId()
-        if (userId == null) {
-            _uiState.value = FavoritosUiState.Error("No hay sesión activa.")
-            return
-        }
+        val userId = getCurrentUserId() ?: return
         _uiState.value = FavoritosUiState.Loading
         viewModelScope.launch {
             try {
@@ -105,19 +96,19 @@ class FavoritosViewModel : ViewModel() {
     }
 
     /**
-     * Carga todos los favoritos del usuario (para pantalla de perfil/favoritos).
+     * Carga todos los favoritos del usuario autenticado.
+     * Útil para una futura pantalla de lista de favoritos.
      */
-    fun loadFavorites() {
-        val userId = currentUserId()
-        if (userId == null) {
-            _uiState.value = FavoritosUiState.Error("Debes iniciar sesión para ver tus favoritos.")
+    fun loadUserFavorites() {
+        val userId = getCurrentUserId() ?: run {
+            _uiState.value = FavoritosUiState.Error("Inicia sesión para ver tus favoritos.")
             return
         }
         _uiState.value = FavoritosUiState.Loading
         viewModelScope.launch {
             try {
-                val lista = repository.getFavoritosByUser(userId)
-                _uiState.value = FavoritosUiState.Success(lista)
+                val list = repository.getFavoritosByUser(userId)
+                _uiState.value = FavoritosUiState.Success(list)
             } catch (e: Exception) {
                 _uiState.value = FavoritosUiState.Error(
                     "Error al cargar favoritos: ${e.message}"
