@@ -2,6 +2,7 @@ package com.example.xalabus.ui.auth
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.example.xalabus.core.util.ErrorMapper
 import com.example.xalabus.data.SupabaseClientProvider
 import io.github.jan.supabase.auth.auth
 import io.github.jan.supabase.auth.providers.builtin.Email
@@ -46,7 +47,7 @@ class AuthViewModel : ViewModel() {
                 _uiState.value = AuthUiState.Success
             } catch (e: Exception) {
                 _uiState.value = AuthUiState.Error(
-                    e.message ?: "Error al iniciar sesión. Verifica tus credenciales."
+                    ErrorMapper.toUserMessage(e, "al iniciar sesión")
                 )
             }
         }
@@ -76,7 +77,7 @@ class AuthViewModel : ViewModel() {
                 _uiState.value = AuthUiState.Success
             } catch (e: Exception) {
                 _uiState.value = AuthUiState.Error(
-                    e.message ?: "Error al registrarse. Intenta con otro correo."
+                    ErrorMapper.toUserMessage(e, "al registrarse")
                 )
             }
         }

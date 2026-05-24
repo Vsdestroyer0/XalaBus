@@ -2,27 +2,28 @@ package com.example.xalabus.ui.auth
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.example.xalabus.core.util.ErrorMapper
 import com.example.xalabus.data.SupabaseClientProvider
 import io.github.jan.supabase.auth.auth
+import io.github.jan.supabase.auth.providers.builtin.Email
+import io.github.jan.supabase.auth.OtpType
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 
 /**
- * Estados del flujo de recuperación de contraseña (CU-03).
- * FA-01: correo no encontrado → Error
- * FA-02: código inválido → Error
- * Ex-01: error de red/servidor → Error
+ * CU-03: Estados de la pantalla de recuperación de contraseña.
+ * Flujo: IDLE → EMAIL_SENT → OTP_VERIFIED → PASSWORD_CHANGED
  */
 sealed class ForgotPasswordUiState {
     object Idle : ForgotPasswordUiState()
     object Loading : ForgotPasswordUiState()
-    /** Correo enviado correctamente — pasar a ingreso del código OTP */
+    /** Correo enviado, esperando que el usuario ingrese el código OTP */
     object EmailSent : ForgotPasswordUiState()
-    /** OTP verificado — el usuario puede cambiar su contraseña */
+    /** OTP verificado, el usuario puede ingresar la nueva contraseña */
     object OtpVerified : ForgotPasswordUiState()
-    /** Contraseña cambiada exitosamente */
+    /** Contraseña cambiada con éxito */
     object PasswordChanged : ForgotPasswordUiState()
     data class Error(val message: String) : ForgotPasswordUiState()
 }
@@ -34,36 +35,35 @@ class ForgotPasswordViewModel : ViewModel() {
     private val _uiState = MutableStateFlow<ForgotPasswordUiState>(ForgotPasswordUiState.Idle)
     val uiState: StateFlow<ForgotPasswordUiState> = _uiState.asStateFlow()
 
-    /** Correo ingresado por el usuario (se guarda para la etapa de verificación OTP) */
-    private var currentEmail: String = ""
+    // Almacena el email para reutilizarlo en verifyOtp
+    private var pendingEmail: String = ""
 
     /**
-     * CU-03 — Paso 1: Envía el código de recuperación al correo.
-     * FA-01: correo no encontrado → Supabase devuelve error → Error.
+     * CU-03 Paso 1: Envía correo de recuperación con código OTP.
+     * FA-01: correo no encontrado → ErrorMapper lo traduce.
      */
-    fun sendRecoveryEmail(email: String) {
+    fun sendPasswordReset(email: String) {
         if (email.isBlank()) {
             _uiState.value = ForgotPasswordUiState.Error("Ingresa tu correo electrónico.")
             return
         }
-        currentEmail = email.trim()
+        pendingEmail = email.trim()
         _uiState.value = ForgotPasswordUiState.Loading
         viewModelScope.launch {
             try {
-                supabase.auth.resetPasswordForEmail(currentEmail)
+                supabase.auth.resetPasswordForEmail(pendingEmail)
                 _uiState.value = ForgotPasswordUiState.EmailSent
             } catch (e: Exception) {
-                // FA-01 / Ex-01
                 _uiState.value = ForgotPasswordUiState.Error(
-                    "No se pudo enviar el correo: ${e.message}"
+                    ErrorMapper.toUserMessage(e, "al enviar el correo")
                 )
             }
         }
     }
 
     /**
-     * CU-03 — Paso 2: Verifica el OTP recibido por correo.
-     * FA-02: código inválido → Supabase devuelve error → Error.
+     * CU-03 Paso 2: Verifica el código OTP recibido por correo.
+     * FA-02: código inválido → ErrorMapper lo traduce.
      */
     fun verifyOtp(otp: String) {
         if (otp.isBlank()) {
@@ -74,25 +74,31 @@ class ForgotPasswordViewModel : ViewModel() {
         viewModelScope.launch {
             try {
                 supabase.auth.verifyEmailOtp(
-                    type  = io.github.jan.supabase.auth.OtpType.Email.RECOVERY,
-                    email = currentEmail,
+                    type  = OtpType.Email.RECOVERY,
+                    email = pendingEmail,
                     token = otp.trim()
                 )
                 _uiState.value = ForgotPasswordUiState.OtpVerified
             } catch (e: Exception) {
-                // FA-02 / Ex-01
                 _uiState.value = ForgotPasswordUiState.Error(
-                    "Código inválido o expirado: ${e.message}"
+                    ErrorMapper.toUserMessage(e, "al verificar el código")
                 )
             }
         }
     }
 
     /**
-     * CU-03 — Paso 3: Actualiza la contraseña tras verificar el OTP.
-     * Postcondición: usuario puede acceder con la nueva contraseña.
+     * CU-03 Paso 3: Actualiza la contraseña del usuario autenticado vía OTP.
      */
-    fun updatePassword(newPassword: String) {
+    fun updatePassword(newPassword: String, confirmPassword: String) {
+        if (newPassword.isBlank() || confirmPassword.isBlank()) {
+            _uiState.value = ForgotPasswordUiState.Error("Por favor completa ambos campos.")
+            return
+        }
+        if (newPassword != confirmPassword) {
+            _uiState.value = ForgotPasswordUiState.Error("Las contraseñas no coinciden.")
+            return
+        }
         if (newPassword.length < 6) {
             _uiState.value = ForgotPasswordUiState.Error("La contraseña debe tener al menos 6 caracteres.")
             return
@@ -100,15 +106,20 @@ class ForgotPasswordViewModel : ViewModel() {
         _uiState.value = ForgotPasswordUiState.Loading
         viewModelScope.launch {
             try {
-                supabase.auth.updateUser { password = newPassword }
+                supabase.auth.updateUser {
+                    password = newPassword
+                }
                 _uiState.value = ForgotPasswordUiState.PasswordChanged
             } catch (e: Exception) {
                 _uiState.value = ForgotPasswordUiState.Error(
-                    "Error al cambiar contraseña: ${e.message}"
+                    ErrorMapper.toUserMessage(e, "al cambiar la contraseña")
                 )
             }
         }
     }
 
-    fun resetState() { _uiState.value = ForgotPasswordUiState.Idle }
+    fun resetState() {
+        _uiState.value = ForgotPasswordUiState.Idle
+        pendingEmail = ""
+    }
 }

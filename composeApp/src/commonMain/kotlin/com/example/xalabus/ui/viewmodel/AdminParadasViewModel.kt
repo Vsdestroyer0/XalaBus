@@ -2,87 +2,102 @@ package com.example.xalabus.ui.viewmodel
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.example.xalabus.data.paradas.Parada
-import com.example.xalabus.data.paradas.ParadasRepository
+import com.example.xalabus.core.util.ErrorMapper
+import com.example.xalabus.data.SupabaseClientProvider
+import io.github.jan.supabase.postgrest.postgrest
+import io.github.jan.supabase.postgrest.query.Columns
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import kotlinx.serialization.Serializable
 
-/** Estados del flujo de agregar parada (CU-12) */
-sealed class AdminParadasUiState {
-    object Idle : AdminParadasUiState()
-    object Loading : AdminParadasUiState()
-    object Success : AdminParadasUiState()
-    data class Error(val message: String) : AdminParadasUiState()
-    /** FA-02: parada duplicada detectada por coordenadas cercanas */
-    data class DuplicateWarning(val cercanas: List<Parada>) : AdminParadasUiState()
+/** CU-12: Modelo de datos de una parada de camión */
+@Serializable
+data class Parada(
+    val id: String = "",
+    val nombre: String,
+    val latitud: Double,
+    val longitud: Double,
+    val ruta_id: String
+)
+
+/** CU-12: Estados de la UI de administración de paradas */
+sealed class ParadasUiState {
+    object Idle    : ParadasUiState()
+    object Loading : ParadasUiState()
+    object Success : ParadasUiState()
+    data class Error(val message: String) : ParadasUiState()
+    /** FA-02: parada duplicada por coordenadas cercanas */
+    object DuplicateWarning : ParadasUiState()
 }
 
 class AdminParadasViewModel : ViewModel() {
 
-    private val repository = ParadasRepository()
+    private val supabase = SupabaseClientProvider.client
 
-    private val _uiState = MutableStateFlow<AdminParadasUiState>(AdminParadasUiState.Idle)
-    val uiState: StateFlow<AdminParadasUiState> = _uiState.asStateFlow()
+    private val _uiState = MutableStateFlow<ParadasUiState>(ParadasUiState.Idle)
+    val uiState: StateFlow<ParadasUiState> = _uiState.asStateFlow()
 
     /**
-     * CU-12 — Registra una nueva parada con coordenadas GPS.
-     * FA-01: datos incompletos → Error.
-     * FA-02: parada duplicada por coordenadas cercanas → DuplicateWarning.
-     * Ex-01: error al guardar → Error.
-     * @param forzar si true, omite la verificación de duplicados y guarda de todas formas.
+     * CU-12: Guarda una nueva parada en Supabase.
+     * FA-01: datos incompletos → validación previa.
+     * FA-02: duplicado por coordenadas → detectado vía ErrorMapper (unique_violation).
      */
-    fun addParada(
-        nombre: String,
-        latitud: String,
-        longitud: String,
-        rutaId: String,
-        forzar: Boolean = false
-    ) {
-        // FA-01: validar datos incompletos
-        if (nombre.isBlank() || latitud.isBlank() || longitud.isBlank() || rutaId.isBlank()) {
-            _uiState.value = AdminParadasUiState.Error("Todos los campos son obligatorios.")
+    fun saveParada(nombre: String, latitud: Double, longitud: Double, rutaId: String) {
+        if (nombre.isBlank() || rutaId.isBlank()) {
+            _uiState.value = ParadasUiState.Error("Completa todos los campos requeridos.")
             return
         }
-
-        val lat = latitud.toDoubleOrNull()
-        val lng = longitud.toDoubleOrNull()
-
-        if (lat == null || lng == null) {
-            _uiState.value = AdminParadasUiState.Error("Latitud y longitud deben ser números válidos.")
+        if (latitud == 0.0 || longitud == 0.0) {
+            _uiState.value = ParadasUiState.Error("Las coordenadas no son válidas.")
             return
         }
-
-        _uiState.value = AdminParadasUiState.Loading
+        _uiState.value = ParadasUiState.Loading
         viewModelScope.launch {
             try {
-                // FA-02: verificar paradas cercanas (solo si no se está forzando)
-                if (!forzar) {
-                    val cercanas = repository.getNearbyParadas(lat, lng)
-                    if (cercanas.isNotEmpty()) {
-                        _uiState.value = AdminParadasUiState.DuplicateWarning(cercanas)
-                        return@launch
-                    }
-                }
-
-                repository.addParada(
-                    Parada(
-                        nombre   = nombre.trim(),
-                        latitud  = lat,
-                        longitud = lng,
-                        rutaId   = rutaId.trim()
-                    )
-                )
-                _uiState.value = AdminParadasUiState.Success
+                supabase.postgrest
+                    .from("paradas")
+                    .insert(mapOf(
+                        "nombre"   to nombre,
+                        "latitud"  to latitud,
+                        "longitud" to longitud,
+                        "ruta_id"  to rutaId
+                    ))
+                _uiState.value = ParadasUiState.Success
             } catch (e: Exception) {
-                // Ex-01: error al guardar
-                _uiState.value = AdminParadasUiState.Error(
-                    "Error al guardar la parada: ${e.message}"
+                val msg = ErrorMapper.toUserMessage(e, "al guardar la parada")
+                // FA-02: si es duplicado, usar estado específico
+                if (msg.contains("ya existe")) {
+                    _uiState.value = ParadasUiState.DuplicateWarning
+                } else {
+                    _uiState.value = ParadasUiState.Error(msg)
+                }
+            }
+        }
+    }
+
+    /** Carga todas las paradas de una ruta específica */
+    fun loadParadasForRoute(rutaId: String) {
+        _uiState.value = ParadasUiState.Loading
+        viewModelScope.launch {
+            try {
+                supabase.postgrest
+                    .from("paradas")
+                    .select(Columns.ALL) {
+                        filter { eq("ruta_id", rutaId) }
+                    }
+                    .decodeList<Parada>()
+                _uiState.value = ParadasUiState.Success
+            } catch (e: Exception) {
+                _uiState.value = ParadasUiState.Error(
+                    ErrorMapper.toUserMessage(e, "al cargar las paradas")
                 )
             }
         }
     }
 
-    fun resetState() { _uiState.value = AdminParadasUiState.Idle }
+    fun resetState() {
+        _uiState.value = ParadasUiState.Idle
+    }
 }

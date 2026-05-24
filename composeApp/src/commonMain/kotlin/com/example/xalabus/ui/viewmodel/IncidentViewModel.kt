@@ -2,18 +2,18 @@ package com.example.xalabus.ui.viewmodel
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.example.xalabus.core.util.ErrorMapper
 import com.example.xalabus.data.SupabaseClientProvider
-import com.example.xalabus.data.incidentes.Incidente
-import com.example.xalabus.data.incidentes.IncidentesRepository
 import io.github.jan.supabase.auth.auth
+import io.github.jan.supabase.postgrest.postgrest
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 
-/** Estados del flujo de reporte de incidente (CU-13) */
+/** CU-13: Estados de la UI de reporte de incidentes */
 sealed class IncidentUiState {
-    object Idle : IncidentUiState()
+    object Idle    : IncidentUiState()
     object Loading : IncidentUiState()
     object Success : IncidentUiState()
     data class Error(val message: String) : IncidentUiState()
@@ -21,72 +21,57 @@ sealed class IncidentUiState {
 
 class IncidentViewModel : ViewModel() {
 
-    private val repository = IncidentesRepository()
-    private val supabase   = SupabaseClientProvider.client
+    private val supabase = SupabaseClientProvider.client
 
     private val _uiState = MutableStateFlow<IncidentUiState>(IncidentUiState.Idle)
     val uiState: StateFlow<IncidentUiState> = _uiState.asStateFlow()
 
-    /** Coordenadas seleccionadas por el usuario en el mapa */
-    private val _selectedLat = MutableStateFlow(19.5438) // Centro de Xalapa por defecto
-    private val _selectedLng = MutableStateFlow(-96.9269)
-    val selectedLat: StateFlow<Double> = _selectedLat.asStateFlow()
-    val selectedLng: StateFlow<Double> = _selectedLng.asStateFlow()
-
-    /** Actualiza el punto en el mapa donde ocurrió el incidente */
-    fun updateLocation(lat: Double, lng: Double) {
-        _selectedLat.value = lat
-        _selectedLng.value = lng
-    }
-
-    private fun getCurrentUserId(): String? =
-        supabase.auth.currentSessionOrNull()?.user?.id
-
     /**
-     * CU-13 — Envía el reporte de incidente a Supabase.
-     * FA-01: coordenadas fuera del rango de Xalapa → Error.
-     * FA-02: descripción vacía → Error.
-     * Ex-01: error al subir → Error con mensaje.
+     * CU-13: Envía un reporte de incidente a Supabase.
+     * FA-01: punto inválido → validación previa en la pantalla.
+     * FA-02: descripción vacía → validación previa en la pantalla.
      */
-    fun submitIncidente(descripcion: String) {
-        // FA-02: descripción vacía
+    fun submitIncident(
+        latitud: Double,
+        longitud: Double,
+        descripcion: String,
+        fotoUrl: String? = null
+    ) {
         if (descripcion.isBlank()) {
-            _uiState.value = IncidentUiState.Error("Describe el problema antes de enviar.")
+            _uiState.value = IncidentUiState.Error("La descripción no puede estar vacía.")
+            return
+        }
+        if (latitud == 0.0 && longitud == 0.0) {
+            _uiState.value = IncidentUiState.Error("Selecciona un punto válido en el mapa.")
             return
         }
 
-        val lat = _selectedLat.value
-        val lng = _selectedLng.value
-
-        // FA-01: validar que las coordenadas sean razonables para Xalapa, Veracruz
-        // Rango aproximado: lat 18.5–20.5, lng -97.5–96.0
-        if (lat !in 18.5..20.5 || lng !in -97.5..-96.0) {
-            _uiState.value = IncidentUiState.Error(
-                "Las coordenadas seleccionadas están fuera del área de servicio."
-            )
-            return
-        }
+        val userId = supabase.auth.currentSessionOrNull()?.user?.id
 
         _uiState.value = IncidentUiState.Loading
         viewModelScope.launch {
             try {
-                repository.reportarIncidente(
-                    Incidente(
-                        userId      = getCurrentUserId(),
-                        latitud     = lat,
-                        longitud    = lng,
-                        descripcion = descripcion.trim()
-                    )
-                )
+                val payload = buildMap<String, Any?> {
+                    userId?.let { put("user_id", it) }
+                    put("latitud", latitud)
+                    put("longitud", longitud)
+                    put("descripcion", descripcion)
+                    fotoUrl?.let { put("foto_url", it) }
+                    put("estado", "pendiente")
+                }
+                supabase.postgrest
+                    .from("reportes")
+                    .insert(payload)
                 _uiState.value = IncidentUiState.Success
             } catch (e: Exception) {
-                // Ex-01: error al subir
                 _uiState.value = IncidentUiState.Error(
-                    "Error al enviar el reporte: ${e.message}"
+                    ErrorMapper.toUserMessage(e, "al enviar el reporte")
                 )
             }
         }
     }
 
-    fun resetState() { _uiState.value = IncidentUiState.Idle }
+    fun resetState() {
+        _uiState.value = IncidentUiState.Idle
+    }
 }
