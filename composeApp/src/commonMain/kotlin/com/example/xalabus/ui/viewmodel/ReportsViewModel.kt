@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.xalabus.core.util.ErrorMapper
 import com.example.xalabus.data.SupabaseClientProvider
+import io.github.jan.supabase.auth.auth
 import io.github.jan.supabase.postgrest.postgrest
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -25,6 +26,31 @@ class ReportsViewModel : ViewModel() {
     private val _uiState = MutableStateFlow<ReportUiState>(ReportUiState.Idle)
     val uiState: StateFlow<ReportUiState> = _uiState.asStateFlow()
 
+    /** Envía un reporte general (quejas, sugerencias, etc.) */
+    fun submitGeneralReport(message: String) {
+        if (message.isBlank()) {
+            _uiState.value = ReportUiState.Error("El mensaje no puede estar vacío.")
+            return
+        }
+        _uiState.value = ReportUiState.Loading
+        viewModelScope.launch {
+            try {
+                val userId = supabase.auth.currentUserOrNull()?.id ?: "anonymous"
+                supabase.postgrest
+                    .from("general_reports")
+                    .insert(mapOf(
+                        "user_id" to userId,
+                        "message" to message
+                    ))
+                _uiState.value = ReportUiState.Success
+            } catch (e: Exception) {
+                _uiState.value = ReportUiState.Error(
+                    ErrorMapper.toUserMessage(e, "al enviar el reporte")
+                )
+            }
+        }
+    }
+
     /** Envía un reporte de cambio sobre una ruta específica */
     fun submitRouteReport(routeId: Int, message: String) {
         if (message.isBlank()) {
@@ -34,9 +60,14 @@ class ReportsViewModel : ViewModel() {
         _uiState.value = ReportUiState.Loading
         viewModelScope.launch {
             try {
+                val userId = supabase.auth.currentUserOrNull()?.id ?: "anonymous"
                 supabase.postgrest
                     .from("route_reports")
-                    .insert(mapOf("route_id" to routeId, "message" to message))
+                    .insert(mapOf(
+                        "user_id" to userId,
+                        "route_id" to routeId, 
+                        "message" to message
+                    ))
                 _uiState.value = ReportUiState.Success
             } catch (e: Exception) {
                 _uiState.value = ReportUiState.Error(
@@ -47,16 +78,24 @@ class ReportsViewModel : ViewModel() {
     }
 
     /** Envía una sugerencia de parada de camión */
-    fun submitStopSuggestion(routeId: Int, latitude: Double, longitude: Double) {
+    fun submitRouteStop(routeId: Int, description: String, latitude: Double, longitude: Double) {
+        if (description.isBlank()) {
+            _uiState.value = ReportUiState.Error("La descripción no puede estar vacía.")
+            return
+        }
         _uiState.value = ReportUiState.Loading
         viewModelScope.launch {
             try {
+                val userId = supabase.auth.currentUserOrNull()?.id ?: "anonymous"
                 supabase.postgrest
-                    .from("stop_suggestions")
+                    .from("route_stops")
                     .insert(mapOf(
+                        "user_id" to userId,
                         "route_id"  to routeId,
-                        "latitud"   to latitude,
-                        "longitud"  to longitude
+                        "description" to description,
+                        "latitude"   to latitude,
+                        "longitude"  to longitude,
+                        "status" to "pending"
                     ))
                 _uiState.value = ReportUiState.Success
             } catch (e: Exception) {

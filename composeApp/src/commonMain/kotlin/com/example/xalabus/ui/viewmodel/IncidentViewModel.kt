@@ -26,23 +26,26 @@ class IncidentViewModel : ViewModel() {
     private val _uiState = MutableStateFlow<IncidentUiState>(IncidentUiState.Idle)
     val uiState: StateFlow<IncidentUiState> = _uiState.asStateFlow()
 
+    private val _selectedLat = MutableStateFlow(19.5438) // Centro de Xalapa por defecto
+    val selectedLat: StateFlow<Double> = _selectedLat.asStateFlow()
+
+    private val _selectedLng = MutableStateFlow(-96.9269)
+    val selectedLng: StateFlow<Double> = _selectedLng.asStateFlow()
+
+    fun updateLocation(lat: Double, lng: Double) {
+        _selectedLat.value = lat
+        _selectedLng.value = lng
+    }
+
     /**
      * CU-13: Envía un reporte de incidente a Supabase.
-     * FA-01: punto inválido → validación previa en la pantalla.
-     * FA-02: descripción vacía → validación previa en la pantalla.
      */
-    fun submitIncident(
-        latitud: Double,
-        longitud: Double,
-        descripcion: String,
-        fotoUrl: String? = null
-    ) {
+    fun submitIncidente(descripcion: String) {
+        val latitud = _selectedLat.value
+        val longitud = _selectedLng.value
+
         if (descripcion.isBlank()) {
             _uiState.value = IncidentUiState.Error("La descripción no puede estar vacía.")
-            return
-        }
-        if (latitud == 0.0 && longitud == 0.0) {
-            _uiState.value = IncidentUiState.Error("Selecciona un punto válido en el mapa.")
             return
         }
 
@@ -56,7 +59,6 @@ class IncidentViewModel : ViewModel() {
                     put("latitud", latitud)
                     put("longitud", longitud)
                     put("descripcion", descripcion)
-                    fotoUrl?.let { put("foto_url", it) }
                     put("estado", "pendiente")
                 }
                 supabase.postgrest

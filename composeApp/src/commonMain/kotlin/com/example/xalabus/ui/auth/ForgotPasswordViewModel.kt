@@ -42,7 +42,7 @@ class ForgotPasswordViewModel : ViewModel() {
      * CU-03 Paso 1: Envía correo de recuperación con código OTP.
      * FA-01: correo no encontrado → ErrorMapper lo traduce.
      */
-    fun sendPasswordReset(email: String) {
+    fun sendRecoveryEmail(email: String) {
         if (email.isBlank()) {
             _uiState.value = ForgotPasswordUiState.Error("Ingresa tu correo electrónico.")
             return
@@ -90,13 +90,9 @@ class ForgotPasswordViewModel : ViewModel() {
     /**
      * CU-03 Paso 3: Actualiza la contraseña del usuario autenticado vía OTP.
      */
-    fun updatePassword(newPassword: String, confirmPassword: String) {
-        if (newPassword.isBlank() || confirmPassword.isBlank()) {
-            _uiState.value = ForgotPasswordUiState.Error("Por favor completa ambos campos.")
-            return
-        }
-        if (newPassword != confirmPassword) {
-            _uiState.value = ForgotPasswordUiState.Error("Las contraseñas no coinciden.")
+    fun updatePassword(newPassword: String) {
+        if (newPassword.isBlank()) {
+            _uiState.value = ForgotPasswordUiState.Error("Por favor completa el campo.")
             return
         }
         if (newPassword.length < 6) {
