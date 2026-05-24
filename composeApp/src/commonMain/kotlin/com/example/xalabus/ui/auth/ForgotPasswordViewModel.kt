@@ -4,7 +4,6 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.xalabus.data.SupabaseClientProvider
 import io.github.jan.supabase.auth.auth
-import io.github.jan.supabase.auth.providers.builtin.Email
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -75,7 +74,7 @@ class ForgotPasswordViewModel : ViewModel() {
         viewModelScope.launch {
             try {
                 supabase.auth.verifyEmailOtp(
-                    type  = io.github.jan.supabase.auth.providers.builtin.OtpType.Email.RECOVERY,
+                    type  = io.github.jan.supabase.auth.OtpType.Email.RECOVERY,
                     email = currentEmail,
                     token = otp.trim()
                 )

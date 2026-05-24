@@ -583,7 +583,7 @@ fun MapDetailView(
  * Si no, estima: número de paradas * tiempo promedio por parada (2 min) + trayecto base.
  * Velocidad promedio urbana asumida: 30 km/h.
  */
-private fun estimateTransitTime(route: com.example.xalabus.data.model.Route?): Int {
+private fun estimateTransitTime(route: com.example.xalabus.DBD.RouteEntity?): Int {
     if (route == null) return 0
     // Intentar extraer minutos del campo frequency (ej: "15 min", "20 minutos")
     val freqText = route.frequency?.lowercase() ?: ""

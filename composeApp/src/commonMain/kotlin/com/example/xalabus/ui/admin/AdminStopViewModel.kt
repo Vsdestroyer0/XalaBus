@@ -66,7 +66,7 @@ class AdminStopViewModel : ViewModel() {
         viewModelScope.launch {
             try {
                 // FA-02: verificar duplicado por coordenadas
-                val duplicate = repository.findNearbyParada(latitud, longitud)
+                val duplicate = repository.getNearbyParadas(latitud, longitud).firstOrNull()
                 if (duplicate != null) {
                     _uiState.value = AdminStopUiState.Error(
                         "Ya existe una parada cercana: \"${duplicate.nombre}\". " +
@@ -75,7 +75,7 @@ class AdminStopViewModel : ViewModel() {
                     return@launch
                 }
 
-                repository.insertParada(
+                repository.addParada(
                     Parada(
                         nombre   = nombre.trim(),
                         latitud  = latitud,
