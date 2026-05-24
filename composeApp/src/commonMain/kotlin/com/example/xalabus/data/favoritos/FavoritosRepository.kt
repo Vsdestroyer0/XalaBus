@@ -2,20 +2,21 @@ package com.example.xalabus.data.favoritos
 
 import com.example.xalabus.data.SupabaseClientProvider
 import io.github.jan.supabase.postgrest.postgrest
-import io.github.jan.supabase.postgrest.query.Columns
+import io.github.jan.supabase.postgrest.query.filter.PostgrestFilterBuilder
 
 /**
- * CU-10: Repositorio para operaciones CRUD sobre la tabla `favoritos` en Supabase.
+ * Repositorio de favoritos — CU-10.
+ * Opera sobre la tabla `favoritos` en Supabase.
  */
 class FavoritosRepository {
     private val client = SupabaseClientProvider.client
 
-    /** Inserta una nueva ruta favorita para el usuario */
+    /** Agrega una ruta a los favoritos del usuario. */
     suspend fun addFavorito(favorito: Favorito) {
         client.postgrest["favoritos"].insert(favorito)
     }
 
-    /** Elimina una ruta de favoritos por userId + routeId */
+    /** Elimina un favorito por userId + routeId. */
     suspend fun removeFavorito(userId: String, routeId: String) {
         client.postgrest["favoritos"].delete {
             filter {
@@ -25,7 +26,7 @@ class FavoritosRepository {
         }
     }
 
-    /** Obtiene todos los favoritos de un usuario */
+    /** Obtiene todos los favoritos del usuario. */
     suspend fun getFavoritosByUser(userId: String): List<Favorito> {
         return client.postgrest["favoritos"]
             .select {
@@ -34,16 +35,16 @@ class FavoritosRepository {
             .decodeList<Favorito>()
     }
 
-    /** Verifica si una ruta ya está en favoritos para el usuario dado */
+    /** Verifica si una ruta ya está en favoritos del usuario. */
     suspend fun isFavorito(userId: String, routeId: String): Boolean {
-        val result = client.postgrest["favoritos"]
-            .select(Columns.list("id")) {
+        val results = client.postgrest["favoritos"]
+            .select {
                 filter {
                     eq("user_id", userId)
                     eq("route_id", routeId)
                 }
             }
             .decodeList<Favorito>()
-        return result.isNotEmpty()
+        return results.isNotEmpty()
     }
 }
