@@ -10,16 +10,31 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 
-/** Estados posibles del flujo de recuperación de contraseña */
+/**
+ * Estados posibles del flujo de recuperación de contraseña (CU-03).
+ *
+ * Flujo principal:
+ *   Idle → [ingresar correo] → Loading → CodeSent → [ingresar OTP] → Loading → PasswordChanged
+ *
+ * Flujos alternativos:
+ *   FA-01: correo no encontrado  → Error
+ *   FA-02: código inválido/expirado → Error
+ *   Ex-01: error de red/servidor  → Error
+ */
 sealed class ForgotPasswordUiState {
+    /** Estado inicial, sin acción en curso */
     object Idle : ForgotPasswordUiState()
+
+    /** Petición en proceso (spinner) */
     object Loading : ForgotPasswordUiState()
-    /** Correo de recuperación enviado exitosamente — paso 1 completado */
-    object EmailSent : ForgotPasswordUiState()
-    /** OTP verificado — paso 2 completado, usuario puede cambiar contraseña */
-    object OtpVerified : ForgotPasswordUiState()
-    /** Contraseña cambiada exitosamente — flujo completado */
+
+    /** Correo enviado correctamente — mostrar campo OTP */
+    data class CodeSent(val email: String) : ForgotPasswordUiState()
+
+    /** Contraseña cambiada exitosamente */
     object PasswordChanged : ForgotPasswordUiState()
+
+    /** Error en cualquier paso del flujo */
     data class Error(val message: String) : ForgotPasswordUiState()
 }
 
@@ -31,88 +46,76 @@ class ForgotPasswordViewModel : ViewModel() {
     val uiState: StateFlow<ForgotPasswordUiState> = _uiState.asStateFlow()
 
     /**
-     * Paso 1: Envía un correo con código OTP al email proporcionado.
-     * FA-01: Si el correo no existe en Supabase Auth, el servicio igualmente responde OK
-     * por seguridad; el usuario verá un mensaje genérico.
+     * Paso 1 — Enviar correo con código OTP de recuperación.
+     * FA-01: si el correo no está registrado Supabase puede no lanzar error visible,
+     *        pero el usuario no recibirá el código.
      */
-    fun sendResetEmail(email: String) {
+    fun sendPasswordResetEmail(email: String) {
         if (email.isBlank()) {
             _uiState.value = ForgotPasswordUiState.Error("Por favor ingresa tu correo electrónico.")
             return
         }
-        val emailTrimmed = email.trim()
-        if (!emailTrimmed.contains("@")) {
-            _uiState.value = ForgotPasswordUiState.Error("Ingresa un correo electrónico válido.")
-            return
-        }
         _uiState.value = ForgotPasswordUiState.Loading
         viewModelScope.launch {
             try {
-                supabase.auth.resetPasswordForEmail(emailTrimmed)
-                _uiState.value = ForgotPasswordUiState.EmailSent
+                supabase.auth.resetPasswordForEmail(email.trim())
+                _uiState.value = ForgotPasswordUiState.CodeSent(email.trim())
             } catch (e: Exception) {
-                // Ex-01: error de red o servicio
+                // FA-01: correo no encontrado u otros errores de red (Ex-01)
                 _uiState.value = ForgotPasswordUiState.Error(
-                    "No se pudo enviar el correo. Verifica tu conexión e intenta nuevamente."
+                    e.message ?: "Error al enviar el correo. Verifica la dirección ingresada."
                 )
             }
         }
     }
 
     /**
-     * Paso 2: Verifica el código OTP de 6 dígitos enviado al correo.
-     * FA-02: Código inválido o expirado → estado Error con mensaje claro.
+     * Paso 2 — Verificar el código OTP y establecer la nueva contraseña.
+     * FA-02: token inválido o expirado → Supabase lanza excepción.
      */
-    fun verifyOtp(email: String, token: String) {
-        if (token.isBlank() || token.length < 6) {
-            _uiState.value = ForgotPasswordUiState.Error("El código debe tener 6 dígitos.")
-            return
+    fun verifyOtpAndChangePassword(
+        email: String,
+        otp: String,
+        newPassword: String,
+        confirmPassword: String
+    ) {
+        when {
+            otp.isBlank() -> {
+                _uiState.value = ForgotPasswordUiState.Error("Ingresa el código recibido en tu correo.")
+                return
+            }
+            newPassword.isBlank() -> {
+                _uiState.value = ForgotPasswordUiState.Error("La nueva contraseña no puede estar vacía.")
+                return
+            }
+            newPassword.length < 6 -> {
+                _uiState.value = ForgotPasswordUiState.Error("La contraseña debe tener al menos 6 caracteres.")
+                return
+            }
+            newPassword != confirmPassword -> {
+                _uiState.value = ForgotPasswordUiState.Error("Las contraseñas no coinciden.")
+                return
+            }
         }
+
         _uiState.value = ForgotPasswordUiState.Loading
         viewModelScope.launch {
             try {
+                // Verificar el OTP de tipo "recovery" con el email
                 supabase.auth.verifyEmailOtp(
-                    type = io.github.jan.supabase.auth.user.UserTokenType.Recovery,
+                    type = io.github.jan.supabase.auth.providers.builtin.OtpType.Email.RECOVERY,
                     email = email.trim(),
-                    token = token.trim()
+                    token = otp.trim()
                 )
-                _uiState.value = ForgotPasswordUiState.OtpVerified
-            } catch (e: Exception) {
-                // FA-02: código inválido o expirado
-                _uiState.value = ForgotPasswordUiState.Error(
-                    "Código incorrecto o expirado. Solicita uno nuevo."
-                )
-            }
-        }
-    }
-
-    /**
-     * Paso 3: Actualiza la contraseña del usuario (requiere sesión activa post-OTP).
-     */
-    fun updatePassword(newPassword: String, confirmPassword: String) {
-        if (newPassword.isBlank() || confirmPassword.isBlank()) {
-            _uiState.value = ForgotPasswordUiState.Error("Por favor completa todos los campos.")
-            return
-        }
-        if (newPassword != confirmPassword) {
-            _uiState.value = ForgotPasswordUiState.Error("Las contraseñas no coinciden.")
-            return
-        }
-        if (newPassword.length < 6) {
-            _uiState.value = ForgotPasswordUiState.Error("La contraseña debe tener al menos 6 caracteres.")
-            return
-        }
-        _uiState.value = ForgotPasswordUiState.Loading
-        viewModelScope.launch {
-            try {
+                // Una vez verificado, actualizar la contraseña del usuario
                 supabase.auth.updateUser {
                     password = newPassword
                 }
                 _uiState.value = ForgotPasswordUiState.PasswordChanged
             } catch (e: Exception) {
-                // Ex-01: error al actualizar
+                // FA-02: código inválido/expirado (Ex-01)
                 _uiState.value = ForgotPasswordUiState.Error(
-                    "Error al cambiar la contraseña. Intenta nuevamente."
+                    e.message ?: "Código incorrecto o expirado. Solicita uno nuevo."
                 )
             }
         }
