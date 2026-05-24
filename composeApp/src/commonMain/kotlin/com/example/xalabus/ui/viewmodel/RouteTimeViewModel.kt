@@ -2,6 +2,7 @@ package com.example.xalabus.ui.viewmodel
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.example.xalabus.core.util.ErrorMapper
 import com.example.xalabus.core.util.TravelTimeEstimator
 import com.example.xalabus.data.SupabaseClientProvider
 import io.github.jan.supabase.postgrest.postgrest
@@ -9,7 +10,6 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
-import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
 /** Modelo parcial de parada para el cálculo de tiempo (CU-11) */
@@ -83,9 +83,9 @@ class RouteTimeViewModel : ViewModel() {
                     )
                 }
             } catch (e: Exception) {
-                // Ex-01: error al cargar datos
+                // Ex-01: traducir con ErrorMapper en lugar de exponer e.message
                 _uiState.value = RouteTimeUiState.Error(
-                    "Error al obtener datos de la ruta: ${e.message}"
+                    ErrorMapper.toUserMessage(e, "al obtener datos de la ruta")
                 )
             }
         }
