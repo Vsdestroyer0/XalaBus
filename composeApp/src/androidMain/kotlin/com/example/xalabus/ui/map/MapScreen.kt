@@ -4,12 +4,18 @@ import android.Manifest
 import android.content.pm.PackageManager
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
+import com.example.xalabus.ui.viewmodel.RouteTimeViewModel
 import com.example.xalabus.ui.viewmodel.RouteViewModel
 import com.mapbox.geojson.LineString
 import com.mapbox.geojson.Point
@@ -20,8 +26,8 @@ import org.maplibre.android.location.LocationComponentActivationOptions
 import org.maplibre.android.location.LocationComponentOptions
 import org.maplibre.android.location.modes.CameraMode
 import org.maplibre.android.location.modes.RenderMode
-import org.maplibre.android.maps.MapView
 import org.maplibre.android.maps.MapLibreMap
+import org.maplibre.android.maps.MapView
 import org.maplibre.android.maps.Style
 import org.maplibre.android.style.layers.LineLayer
 import org.maplibre.android.style.layers.Property
@@ -31,23 +37,32 @@ import com.example.xalabus.core.util.MapFileManager
 import com.example.xalabus.R
 import java.io.File
 
+/**
+ * CU-11: actual MapScreen para Android.
+ * Se agrega un [Box] que superpone el [RouteTimePanel] en la parte inferior
+ * del mapa cuando hay una ruta activa. El panel se muestra/oculta según
+ * el estado del [RouteTimeViewModel].
+ */
 @Composable
 actual fun MapScreen(
     fileManager: MapFileManager,
     viewModel: RouteViewModel,
-    isDarkMode: Boolean
+    isDarkMode: Boolean,
+    routeTimeViewModel: RouteTimeViewModel
 ) {
     val context = LocalContext.current
     val mapPath by viewModel.mapFilePath.collectAsState()
     val routePoints by viewModel.selectedRoutePoints.collectAsState()
+    // CU-11: ID de la ruta actualmente seleccionada para cargar sus paradas
+    val selectedRouteId by viewModel.selectedRouteId.collectAsState()
 
     val xalapaCenter = LatLng(19.5273, -96.9239)
     val mapView = rememberMapViewWithLifecycle()
 
-    // Referencia al mapa y al estilo cargado, separadas para poder
-    // reaccionar a cambios de routePoints sin recargar el estilo completo
     var mapLibreMap by remember { mutableStateOf<MapLibreMap?>(null) }
     var loadedStyle by remember { mutableStateOf<Style?>(null) }
+    // CU-11: controla la visibilidad del panel de tiempo estimado
+    var showTimePanel by remember { mutableStateOf(false) }
 
     // --- GESTIÓN DE PERMISOS ---
     val permissionLauncher = rememberLauncherForActivityResult(
@@ -72,9 +87,12 @@ actual fun MapScreen(
         }
     }
 
-    // ── Efecto 1: Inicializar mapa y cargar estilo UNA SOLA VEZ ──────────────
-    // Se re-ejecuta solo si cambia la ruta del archivo o el modo oscuro.
-    // NO depende de routePoints, por lo que no se reinicia al seleccionar una ruta.
+    // CU-11: mostrar el panel cuando hay una ruta seleccionada
+    LaunchedEffect(selectedRouteId) {
+        showTimePanel = selectedRouteId.isNotBlank()
+    }
+
+    // ── Efecto 1: Inicializar mapa y cargar estilo UNA SOLA VEZ ────────────────
     LaunchedEffect(mapPath, isDarkMode) {
         val path = mapPath ?: return@LaunchedEffect
         mapView.getMapAsync { map ->
@@ -86,40 +104,33 @@ actual fun MapScreen(
             val mapDir = File(path).parent ?: ""
             val finalStyle = styleJson.replace("{mbtiles_path}", mapDir)
 
-            // Reiniciar la referencia al estilo para que el Efecto 2 se re-ejecute
             loadedStyle = null
             map.setStyle(Style.Builder().fromJson(finalStyle)) { style ->
-                // Activar localización si hay permisos
                 if (ContextCompat.checkSelfPermission(
                         context, Manifest.permission.ACCESS_FINE_LOCATION
                     ) == PackageManager.PERMISSION_GRANTED
                 ) {
                     enableLocation(map, style, context)
                 }
-                // Publicar el estilo listo → dispara el Efecto 2
                 loadedStyle = style
             }
         }
     }
 
-    // ── Efecto 2: Dibujar/actualizar la ruta cuando cambian los puntos ────────
-    // Se ejecuta cada vez que el usuario selecciona una ruta diferente
-    // o cuando el estilo termina de cargarse (loadedStyle pasa de null a Style).
+    // ── Efecto 2: Dibujar/actualizar la ruta cuando cambian los puntos ──────────
     LaunchedEffect(routePoints, loadedStyle) {
-        val style = loadedStyle ?: return@LaunchedEffect  // esperar a que el style esté listo
+        val style = loadedStyle ?: return@LaunchedEffect
         val map   = mapLibreMap  ?: return@LaunchedEffect
 
         val routeSourceId = "route-source"
         val routeLayerId  = "route-layer"
 
         if (routePoints.isNotEmpty()) {
-            // Combinar TODAS las variantes (ida + vuelta) en una sola LineString
             val allPoints = routePoints.flatten().map { coord -> Point.fromLngLat(coord[0], coord[1]) }
             val lineString = LineString.fromLngLats(allPoints)
 
             val existingSource = style.getSourceAs<GeoJsonSource>(routeSourceId)
             if (existingSource == null) {
-                // Primera vez: crear fuente y capa
                 style.addSource(GeoJsonSource(routeSourceId, lineString.toJson()))
                 style.addLayer(
                     LineLayer(routeLayerId, routeSourceId).apply {
@@ -132,28 +143,45 @@ actual fun MapScreen(
                     }
                 )
             } else {
-                // Ruta cambiada: solo actualizar el GeoJSON sin recrear la capa
                 existingSource.setGeoJson(lineString.toJson())
             }
 
-            // Hacer zoom para encuadrar la ruta completa
             val boundsCoords = routePoints.flatten().map { coord -> LatLng(coord[1], coord[0]) }
             if (boundsCoords.size >= 2) {
                 val bounds = LatLngBounds.Builder().includes(boundsCoords).build()
                 map.easeCamera(CameraUpdateFactory.newLatLngBounds(bounds, 120), 1000)
             }
         } else {
-            // Sin ruta seleccionada: limpiar la línea del mapa
             style.getSourceAs<GeoJsonSource>(routeSourceId)
                 ?.setGeoJson(LineString.fromLngLats(emptyList()).toJson())
         }
     }
 
-    // AndroidView solo monta el MapView — sin lógica de negocio aquí
-    AndroidView(
-        factory = { mapView },
-        modifier = Modifier.fillMaxSize()
-    )
+    // ── UI: mapa + panel CU-11 superpuesto en la parte inferior ─────────────
+    Box(modifier = Modifier.fillMaxSize()) {
+
+        // Capa 1: el mapa nativo de MapLibre
+        AndroidView(
+            factory = { mapView },
+            modifier = Modifier.fillMaxSize()
+        )
+
+        // Capa 2 (CU-11): panel de tiempo estimado en la parte inferior
+        if (showTimePanel && selectedRouteId.isNotBlank()) {
+            Box(
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .fillMaxWidth()
+                    .padding(bottom = 16.dp)
+            ) {
+                RouteTimePanel(
+                    routeId = selectedRouteId,
+                    routeTimeViewModel = routeTimeViewModel,
+                    onDismiss = { showTimePanel = false }
+                )
+            }
+        }
+    }
 }
 
 private fun enableLocation(map: MapLibreMap, style: Style, context: android.content.Context) {
@@ -163,7 +191,7 @@ private fun enableLocation(map: MapLibreMap, style: Style, context: android.cont
         .foregroundDrawable(R.drawable.ic_user_marker)
         .gpsDrawable(R.drawable.ic_user_marker)
         .bearingDrawable(R.drawable.ic_user_marker)
-        .accuracyAlpha(0.0f) // Sin círculo de precisión
+        .accuracyAlpha(0.0f)
         .build()
 
     val activationOptions = LocationComponentActivationOptions.builder(context, style)
