@@ -6,7 +6,6 @@ import com.example.xalabus.core.util.ErrorMapper
 import com.example.xalabus.data.SupabaseClientProvider
 import io.github.jan.supabase.auth.auth
 import io.github.jan.supabase.auth.OtpType
-import io.github.jan.supabase.auth.user.UserInfo
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -28,6 +27,22 @@ sealed class ForgotPasswordUiState {
     data class Error(val message: String) : ForgotPasswordUiState()
 }
 
+/**
+ * Palabras clave que Supabase/GoTrue incluye en el mensaje de error
+ * cuando se intenta actualizar la contraseña con la misma contraseña actual.
+ */
+private val SAME_PASSWORD_KEYWORDS = listOf(
+    "same password",
+    "different from the old password",
+    "should be different from the old password",
+    "new password should be different"
+)
+
+private fun isSamePasswordError(e: Exception): Boolean {
+    val msg = e.message?.lowercase() ?: return false
+    return SAME_PASSWORD_KEYWORDS.any { keyword -> msg.contains(keyword) }
+}
+
 class ForgotPasswordViewModel : ViewModel() {
 
     private val supabase = SupabaseClientProvider.client
@@ -38,12 +53,9 @@ class ForgotPasswordViewModel : ViewModel() {
     // Almacena el email para reutilizarlo en verifyOtp
     private var pendingEmail: String = ""
 
-    /**
-     * Fix CU-03: Guardamos el accessToken que Supabase devuelve al verificar el OTP.
-     * Es necesario porque verifyEmailOtp establece una sesión temporal y updateUser
-     * la necesita activa para autorizarse. Si el SessionManager de KMP no la persiste
-     * entre corrutinas, este token es nuestra fuente de verdad.
-     */
+    // Guarda el accessToken que Supabase devuelve al verificar el OTP de recuperación.
+    // Necesario porque verifyEmailOtp establece una sesión temporal que puede no
+    // persistir entre corrutinas en el SessionManager de KMP.
     private var recoveryAccessToken: String? = null
 
     /**
@@ -73,9 +85,7 @@ class ForgotPasswordViewModel : ViewModel() {
     /**
      * CU-03 Paso 2: Verifica el código OTP recibido por correo.
      * FA-02: código inválido → ErrorMapper lo traduce.
-     *
-     * FIX: Después de verifyEmailOtp, leemos la sesión activa del cliente
-     * y guardamos el accessToken en memoria para usarlo en updatePassword.
+     * Guarda el accessToken de la sesión establecida para usarlo en updatePassword.
      */
     fun verifyOtp(otp: String) {
         if (otp.isBlank()) {
@@ -90,10 +100,8 @@ class ForgotPasswordViewModel : ViewModel() {
                     email = pendingEmail,
                     token = otp.trim()
                 )
-                // Guardar el accessToken de la sesión recién establecida
                 recoveryAccessToken = supabase.auth.currentSessionOrNull()?.accessToken
                 if (recoveryAccessToken == null) {
-                    // La sesión no se estableció correctamente
                     _uiState.value = ForgotPasswordUiState.Error(
                         "No se pudo establecer la sesión de recuperación. Intenta de nuevo."
                     )
@@ -111,10 +119,11 @@ class ForgotPasswordViewModel : ViewModel() {
     /**
      * CU-03 Paso 3: Actualiza la contraseña del usuario autenticado vía OTP.
      *
-     * FIX: Usamos updateUser que opera sobre la sesión activa en el cliente.
-     * Si por alguna razón la sesión fue limpiada entre corrutinas (bug conocido
-     * del KMP client con SessionManager en memoria), reimportamos el token
-     * antes de llamar a updateUser para garantizar el contexto autenticado.
+     * Antes de llamar a updateUser se verifica que la sesión sigue activa;
+     * si no, se reimporta el accessToken guardado en el Paso 2.
+     *
+     * Fix UX: si Supabase rechaza la nueva contraseña por ser igual a la actual,
+     * se muestra un mensaje claro al usuario en lugar del error genérico del backend.
      */
     fun updatePassword(newPassword: String) {
         if (newPassword.isBlank()) {
@@ -127,7 +136,6 @@ class ForgotPasswordViewModel : ViewModel() {
         }
         val token = recoveryAccessToken
         if (token == null) {
-            // Sesión expirada o se perdió el token — pedir al usuario que repita el flujo
             _uiState.value = ForgotPasswordUiState.Error(
                 "La sesión de recuperación expiró. Por favor solicita un nuevo código."
             )
@@ -136,9 +144,8 @@ class ForgotPasswordViewModel : ViewModel() {
         _uiState.value = ForgotPasswordUiState.Loading
         viewModelScope.launch {
             try {
-                // Reimportar la sesión activa si fue limpiada entre corrutinas
-                val session = supabase.auth.currentSessionOrNull()
-                if (session == null) {
+                // Reimportar sesión si fue limpiada entre corrutinas
+                if (supabase.auth.currentSessionOrNull() == null) {
                     supabase.auth.importAuthToken(token)
                 }
                 supabase.auth.updateUser {
@@ -147,9 +154,13 @@ class ForgotPasswordViewModel : ViewModel() {
                 recoveryAccessToken = null
                 _uiState.value = ForgotPasswordUiState.PasswordChanged
             } catch (e: Exception) {
-                _uiState.value = ForgotPasswordUiState.Error(
+                // Mensaje específico y claro cuando el usuario intenta usar la misma contraseña
+                val mensaje = if (isSamePasswordError(e)) {
+                    "La nueva contraseña debe ser diferente a la contraseña actual."
+                } else {
                     ErrorMapper.toUserMessage(e, "al cambiar la contraseña")
-                )
+                }
+                _uiState.value = ForgotPasswordUiState.Error(mensaje)
             }
         }
     }
