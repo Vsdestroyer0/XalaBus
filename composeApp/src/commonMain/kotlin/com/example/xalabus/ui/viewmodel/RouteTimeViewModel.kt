@@ -63,7 +63,7 @@ class RouteTimeViewModel : ViewModel() {
             totalKm += haversineKm(lat1, lon1, lat2, lon2)
         }
 
-        val totalMinutes = ((totalKm / SPEED_KMH) * 60).roundToInt()
+        val totalMinutes = ((totalKm / SPEED_KMH) * 60).toInt()
         val distanceRounded = (totalKm * 10).toLong() / 10.0
 
         _uiState.value = RouteTimeUiState.Result(
@@ -100,5 +100,3 @@ class RouteTimeViewModel : ViewModel() {
         }
     }
 }
-
-private fun Double.roundToInt(): Int = kotlin.math.roundToInt(this)

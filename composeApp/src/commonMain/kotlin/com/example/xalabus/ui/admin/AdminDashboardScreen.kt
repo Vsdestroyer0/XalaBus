@@ -14,8 +14,6 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.example.xalabus.ui.viewmodel.AdminStopsUiState
-import com.example.xalabus.ui.viewmodel.AdminStopsViewModel
 import kotlinx.coroutines.launch
 
 private val AdminBg     = Color(0xFF080C14)
@@ -140,8 +138,24 @@ fun AdminDashboardScreen(
         ) { padding ->
             Box(modifier = Modifier.fillMaxSize().padding(padding)) {
                 when (currentScreen) {
-                    AdminScreenDestination.DASHBOARD -> DashboardContent()
-                    AdminScreenDestination.STOPS -> AdminStopsContent(stopsViewModel)
+                    AdminScreenDestination.DASHBOARD -> AdminMainDashboard(
+                        viewModel = viewModel,
+                        adminBg = AdminBg,
+                        adminText = AdminText,
+                        adminAccent = AdminAccent,
+                        adminMuted = AdminMuted,
+                        adminCardBg = AdminCardBg
+                    )
+                    AdminScreenDestination.STOPS -> AdminStopsList(
+                        viewModel = stopsViewModel,
+                        adminBg = AdminBg,
+                        adminText = AdminText,
+                        adminAccent = AdminAccent,
+                        adminMuted = AdminMuted,
+                        adminCardBg = AdminCardBg,
+                        approveGreen = ApproveGreen,
+                        rejectRed = RejectRed
+                    )
                 }
             }
         }
@@ -149,128 +163,156 @@ fun AdminDashboardScreen(
 }
 
 @Composable
-fun DashboardContent() {
+private fun AdminMainDashboard(
+    viewModel: AdminViewModel,
+    adminBg: Color,
+    adminText: Color,
+    adminAccent: Color,
+    adminMuted: Color,
+    adminCardBg: Color
+) {
+    val uiState by viewModel.uiState.collectAsState()
+
     Column(
-        modifier = Modifier.fillMaxSize(),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center
+        modifier = Modifier
+            .fillMaxSize()
+            .background(adminBg)
+            .padding(16.dp),
+        verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
-        Icon(
-            Icons.Default.AdminPanelSettings,
-            contentDescription = null,
-            tint = AdminAccent,
-            modifier = Modifier.size(64.dp)
-        )
-        Spacer(Modifier.height(16.dp))
         Text(
-            "Bienvenido al Panel de Control",
-            color = AdminText,
-            fontSize = 20.sp,
+            "Panel de Administración",
+            color = adminText,
+            fontSize = 22.sp,
             fontWeight = FontWeight.Bold
         )
         Text(
-            "Selecciona una opción del menú lateral.",
-            color = AdminMuted,
+            "Gestiona el sistema XalaBus",
+            color = adminMuted,
             fontSize = 14.sp
         )
+
+        when (val s = uiState) {
+            is AdminUiState.Loading -> {
+                Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    CircularProgressIndicator(color = adminAccent)
+                }
+            }
+            is AdminUiState.Error -> {
+                Card(
+                    colors = CardDefaults.cardColors(containerColor = Color(0xFF3B0000)),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text(
+                        s.message,
+                        modifier = Modifier.padding(12.dp),
+                        color = Color(0xFFFF8A80)
+                    )
+                }
+            }
+            else -> {
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = CardDefaults.cardColors(containerColor = adminCardBg)
+                ) {
+                    Column(Modifier.padding(16.dp)) {
+                        Text("Sistema activo", color = adminText, fontWeight = FontWeight.Bold)
+                        Spacer(Modifier.height(4.dp))
+                        Text("Usa el menú lateral para navegar entre secciones.", color = adminMuted, fontSize = 13.sp)
+                    }
+                }
+            }
+        }
     }
 }
 
 @Composable
-fun AdminStopsContent(viewModel: AdminStopsViewModel) {
+private fun AdminStopsList(
+    viewModel: AdminStopsViewModel,
+    adminBg: Color,
+    adminText: Color,
+    adminAccent: Color,
+    adminMuted: Color,
+    adminCardBg: Color,
+    approveGreen: Color,
+    rejectRed: Color
+) {
     val uiState by viewModel.uiState.collectAsState()
 
-    when (uiState) {
-        is AdminStopsUiState.Loading -> {
-            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                CircularProgressIndicator(color = AdminAccent)
-            }
-        }
-        is AdminStopsUiState.Error -> {
-            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                Text(
-                    text = (uiState as AdminStopsUiState.Error).message,
-                    color = RejectRed,
-                    modifier = Modifier.padding(16.dp)
-                )
-            }
-        }
-        is AdminStopsUiState.Success -> {
-            val stops = (uiState as AdminStopsUiState.Success).stops
-            
-            if (stops.isEmpty()) {
-                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    Text("No hay paradas pendientes por revisar.", color = AdminMuted)
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(adminBg)
+            .padding(16.dp)
+    ) {
+        when (val s = uiState) {
+            is AdminStopsUiState.Loading -> {
+                Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    CircularProgressIndicator(color = adminAccent)
                 }
-            } else {
-                LazyColumn(
-                    contentPadding = PaddingValues(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(12.dp)
+            }
+            is AdminStopsUiState.Error -> {
+                Card(
+                    colors = CardDefaults.cardColors(containerColor = Color(0xFF3B0000)),
+                    modifier = Modifier.fillMaxWidth()
                 ) {
-                    items(stops) { stop ->
-                        var editDesc by remember(stop.id) { mutableStateOf(stop.description) }
-                        
-                        Card(
-                            colors = CardDefaults.cardColors(containerColor = AdminCardBg),
-                            elevation = CardDefaults.cardElevation(defaultElevation = 4.dp),
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
-                            Column(modifier = Modifier.padding(16.dp)) {
-                                Text("Ruta ID: ${stop.routeId}", color = AdminAccent, fontWeight = FontWeight.Bold)
-                                Text("Coordenadas: ${stop.latitude}, ${stop.longitude}", color = AdminMuted, fontSize = 12.sp)
-                                
-                                Spacer(modifier = Modifier.height(8.dp))
-                                
-                                OutlinedTextField(
-                                    value = editDesc,
-                                    onValueChange = { editDesc = it },
-                                    label = { Text("Descripción (Editable)", color = AdminMuted) },
-                                    modifier = Modifier.fillMaxWidth(),
-                                    colors = OutlinedTextFieldDefaults.colors(
-                                        focusedTextColor = AdminText,
-                                        unfocusedTextColor = AdminText,
-                                        focusedBorderColor = AdminAccent,
-                                        unfocusedBorderColor = AdminMuted
+                    Text(
+                        s.message,
+                        modifier = Modifier.padding(12.dp),
+                        color = Color(0xFFFF8A80)
+                    )
+                }
+            }
+            is AdminStopsUiState.Success -> {
+                if (s.stops.isEmpty()) {
+                    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            Icon(
+                                Icons.Default.CheckCircle,
+                                contentDescription = null,
+                                tint = approveGreen,
+                                modifier = Modifier.size(48.dp)
+                            )
+                            Spacer(Modifier.height(8.dp))
+                            Text("No hay sugerencias pendientes", color = adminMuted)
+                        }
+                    }
+                } else {
+                    LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        items(s.stops) { stop ->
+                            Card(
+                                modifier = Modifier.fillMaxWidth(),
+                                colors = CardDefaults.cardColors(containerColor = adminCardBg)
+                            ) {
+                                Column(Modifier.padding(12.dp)) {
+                                    Text(stop.nombre, color = adminText, fontWeight = FontWeight.Bold)
+                                    Text(
+                                        "Lat: ${stop.latitud}  Lon: ${stop.longitud}",
+                                        color = adminMuted,
+                                        fontSize = 12.sp
                                     )
-                                )
-                                
-                                Spacer(modifier = Modifier.height(12.dp))
-                                
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.End,
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    TextButton(
-                                        onClick = { 
-                                            stop.id?.let { viewModel.updateStopStatus(it, "rejected", editDesc) }
-                                        },
-                                        colors = ButtonDefaults.textButtonColors(contentColor = RejectRed)
-                                    ) {
-                                        Icon(Icons.Default.Close, null, Modifier.size(18.dp))
-                                        Spacer(Modifier.width(4.dp))
-                                        Text("Rechazar")
-                                    }
-                                    
-                                    Spacer(modifier = Modifier.width(8.dp))
-                                    
-                                    Button(
-                                        onClick = { 
-                                            stop.id?.let { viewModel.updateStopStatus(it, "accepted", editDesc) }
-                                        },
-                                        colors = ButtonDefaults.buttonColors(
-                                            containerColor = ApproveGreen,
-                                            contentColor = Color.White
-                                        )
-                                    ) {
-                                        Icon(Icons.Default.Check, null, Modifier.size(18.dp))
-                                        Spacer(Modifier.width(4.dp))
-                                        Text("Aprobar")
+                                    Spacer(Modifier.height(8.dp))
+                                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                        Button(
+                                            onClick = { viewModel.approveStop(stop) },
+                                            colors = ButtonDefaults.buttonColors(containerColor = approveGreen),
+                                            modifier = Modifier.weight(1f)
+                                        ) { Text("Aprobar", fontSize = 12.sp) }
+                                        OutlinedButton(
+                                            onClick = { viewModel.rejectStop(stop) },
+                                            border = androidx.compose.foundation.BorderStroke(1.dp, rejectRed),
+                                            modifier = Modifier.weight(1f)
+                                        ) { Text("Rechazar", color = rejectRed, fontSize = 12.sp) }
                                     }
                                 }
                             }
                         }
                     }
+                }
+            }
+            else -> {
+                Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    Text("Cargando sugerencias...", color = adminMuted)
                 }
             }
         }

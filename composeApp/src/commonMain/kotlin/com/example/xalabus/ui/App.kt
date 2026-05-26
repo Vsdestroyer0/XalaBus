@@ -477,7 +477,10 @@ fun MapDetailView(
                     shape     = MaterialTheme.shapes.large,
                     elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
                 ) {
-                    Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
+                    Box(
+                        contentAlignment = Alignment.Center,
+                        modifier = Modifier.fillMaxSize()
+                    ) {
                         if (imageBitmap != null) {
                             Image(
                                 bitmap       = imageBitmap!!,
@@ -485,7 +488,33 @@ fun MapDetailView(
                                 modifier     = Modifier.fillMaxSize(),
                                 contentScale = ContentScale.Crop
                             )
-                        } else { DefaultPlaceholder() }
+                        } else {
+                            // Placeholder cuando no hay imagen disponible
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .background(MaterialTheme.colorScheme.surfaceVariant),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Column(
+                                    horizontalAlignment = Alignment.CenterHorizontally,
+                                    verticalArrangement = Arrangement.Center
+                                ) {
+                                    Icon(
+                                        Icons.Default.DirectionsBus,
+                                        contentDescription = null,
+                                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        modifier = Modifier.size(40.dp)
+                                    )
+                                    Spacer(Modifier.height(4.dp))
+                                    Text(
+                                        "Ruta $formattedId",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
+                            }
+                        }
                     }
                 }
 

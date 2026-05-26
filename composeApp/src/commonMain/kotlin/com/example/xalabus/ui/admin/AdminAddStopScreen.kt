@@ -15,8 +15,6 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import com.example.xalabus.data.paradas.Parada
-import com.example.xalabus.ui.viewmodel.AdminParadasUiState
-import com.example.xalabus.ui.viewmodel.AdminParadasViewModel
 
 /**
  * CU-12 — Pantalla para registrar una nueva parada de camión.
@@ -31,7 +29,7 @@ import com.example.xalabus.ui.viewmodel.AdminParadasViewModel
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AdminAddStopScreen(
-    viewModel: AdminParadasViewModel,
+    viewModel: AdminStopViewModel,
     onBack: () -> Unit
 ) {
     val uiState by viewModel.uiState.collectAsState()
@@ -41,18 +39,9 @@ fun AdminAddStopScreen(
     var longitud by remember { mutableStateOf("") }
     var rutaId   by remember { mutableStateOf("") }
 
-    // Diálogo de confirmación para paradas cercanas (FA-02)
-    var showDuplicateDialog by remember { mutableStateOf(false) }
-    var nearbyStops         by remember { mutableStateOf<List<Parada>>(emptyList()) }
-
     LaunchedEffect(uiState) {
-        when (val s = uiState) {
-            is AdminParadasUiState.DuplicateWarning -> {
-                nearbyStops       = s.cercanas
-                showDuplicateDialog = true
-            }
-            is AdminParadasUiState.Success -> {
-                // Limpiar formulario tras éxito
+        when (uiState) {
+            is AdminStopUiState.Success -> {
                 nombre   = ""
                 latitud  = ""
                 longitud = ""
@@ -60,49 +49,6 @@ fun AdminAddStopScreen(
             }
             else -> Unit
         }
-    }
-
-    // FA-02: Diálogo de parada duplicada detectada
-    if (showDuplicateDialog) {
-        AlertDialog(
-            onDismissRequest = {
-                showDuplicateDialog = false
-                viewModel.resetState()
-            },
-            icon  = { Icon(Icons.Default.Warning, null, tint = MaterialTheme.colorScheme.error) },
-            title = { Text("Posible duplicado") },
-            text  = {
-                Column {
-                    Text("Se encontraron ${nearbyStops.size} parada(s) cercanas:")
-                    Spacer(Modifier.height(8.dp))
-                    nearbyStops.forEach { stop ->
-                        Text(
-                            "• ${stop.nombre} (${stop.latitud}, ${stop.longitud})",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-                    Spacer(Modifier.height(8.dp))
-                    Text("¿Deseas guardar la parada de todas formas?")
-                }
-            },
-            confirmButton = {
-                TextButton(
-                    onClick = {
-                        showDuplicateDialog = false
-                        viewModel.addParada(nombre, latitud, longitud, rutaId, forzar = true)
-                    }
-                ) { Text("Sí, guardar") }
-            },
-            dismissButton = {
-                TextButton(
-                    onClick = {
-                        showDuplicateDialog = false
-                        viewModel.resetState()
-                    }
-                ) { Text("Cancelar") }
-            }
-        )
     }
 
     Scaffold(
@@ -197,7 +143,7 @@ fun AdminAddStopScreen(
 
             // ── Mensajes de estado ────────────────────────────────────────────
             when (val s = uiState) {
-                is AdminParadasUiState.Error ->
+                is AdminStopUiState.Error ->
                     Card(
                         colors = CardDefaults.cardColors(
                             containerColor = MaterialTheme.colorScheme.errorContainer
@@ -210,7 +156,7 @@ fun AdminAddStopScreen(
                             style    = MaterialTheme.typography.bodySmall
                         )
                     }
-                is AdminParadasUiState.Success ->
+                is AdminStopUiState.Success ->
                     Card(
                         colors = CardDefaults.cardColors(
                             containerColor = MaterialTheme.colorScheme.primaryContainer
@@ -230,11 +176,11 @@ fun AdminAddStopScreen(
 
             // ── Botón guardar ─────────────────────────────────────────────────
             Button(
-                onClick  = { viewModel.addParada(nombre, latitud, longitud, rutaId) },
+                onClick  = { viewModel.saveParada(nombre, latitud, longitud, rutaId) },
                 modifier = Modifier.fillMaxWidth().height(52.dp),
-                enabled  = uiState !is AdminParadasUiState.Loading
+                enabled  = uiState !is AdminStopUiState.Loading
             ) {
-                if (uiState is AdminParadasUiState.Loading) {
+                if (uiState is AdminStopUiState.Loading) {
                     CircularProgressIndicator(
                         modifier    = Modifier.size(18.dp),
                         strokeWidth = 2.dp,
