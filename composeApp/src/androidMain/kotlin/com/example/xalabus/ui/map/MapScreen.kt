@@ -6,14 +6,10 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.*
 import androidx.compose.runtime.getValue
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
 import com.example.xalabus.ui.viewmodel.RouteTimeViewModel
@@ -38,12 +34,6 @@ import com.example.xalabus.core.util.MapFileManager
 import com.example.xalabus.R
 import java.io.File
 
-/**
- * CU-11: actual MapScreen para Android.
- * Se agrega un [Box] que superpone el [RouteTimePanel] en la parte inferior
- * del mapa cuando hay una ruta activa. El panel se muestra/oculta según
- * el estado del [RouteTimeViewModel].
- */
 @Composable
 actual fun MapScreen(
     fileManager: MapFileManager,
@@ -54,16 +44,12 @@ actual fun MapScreen(
     val context = LocalContext.current
     val mapPath by viewModel.mapFilePath.collectAsState()
     val routePoints by viewModel.selectedRoutePoints.collectAsState()
-    // CU-11: ID de la ruta actualmente seleccionada para cargar sus paradas
-    val selectedRouteId by viewModel.selectedRouteId.collectAsState()
 
     val xalapaCenter = LatLng(19.5273, -96.9239)
     val mapView = rememberMapViewWithLifecycle()
 
     var mapLibreMap by remember { mutableStateOf<MapLibreMap?>(null) }
     var loadedStyle by remember { mutableStateOf<Style?>(null) }
-    // CU-11: controla la visibilidad del panel de tiempo estimado
-    var showTimePanel by remember { mutableStateOf(false) }
 
     // --- GESTIÓN DE PERMISOS ---
     val permissionLauncher = rememberLauncherForActivityResult(
@@ -88,12 +74,7 @@ actual fun MapScreen(
         }
     }
 
-    // CU-11: mostrar el panel cuando hay una ruta seleccionada
-    LaunchedEffect(selectedRouteId) {
-        showTimePanel = selectedRouteId.isNotBlank()
-    }
-
-    // ── Efecto 1: Inicializar mapa y cargar estilo UNA SOLA VEZ ────────────────
+    // ── Efecto 1: Inicializar mapa y cargar estilo ────────────────────────────
     LaunchedEffect(mapPath, isDarkMode) {
         val path = mapPath ?: return@LaunchedEffect
         mapView.getMapAsync { map ->
@@ -118,7 +99,7 @@ actual fun MapScreen(
         }
     }
 
-    // ── Efecto 2: Dibujar/actualizar la ruta cuando cambian los puntos ──────────
+    // ── Efecto 2: Dibujar/actualizar la ruta cuando cambian los puntos ────────
     LaunchedEffect(routePoints, loadedStyle) {
         val style = loadedStyle ?: return@LaunchedEffect
         val map   = mapLibreMap  ?: return@LaunchedEffect
@@ -158,30 +139,12 @@ actual fun MapScreen(
         }
     }
 
-    // ── UI: mapa + panel CU-11 superpuesto en la parte inferior ─────────────
+    // ── UI: solo el mapa (CU-11 se muestra en el bottom sheet de App.kt) ─────
     Box(modifier = Modifier.fillMaxSize()) {
-
-        // Capa 1: el mapa nativo de MapLibre
         AndroidView(
             factory = { mapView },
             modifier = Modifier.fillMaxSize()
         )
-
-        // Capa 2 (CU-11): panel de tiempo estimado en la parte inferior
-        if (showTimePanel && selectedRouteId.isNotBlank()) {
-            Box(
-                modifier = Modifier
-                    .align(Alignment.BottomCenter)
-                    .fillMaxWidth()
-                    .padding(bottom = 16.dp)
-            ) {
-                RouteTimePanel(
-                    routeId = selectedRouteId,
-                    routeTimeViewModel = routeTimeViewModel,
-                    onDismiss = { showTimePanel = false }
-                )
-            }
-        }
     }
 }
 

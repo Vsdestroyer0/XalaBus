@@ -13,6 +13,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -386,11 +387,9 @@ fun MapDetailView(
 
     var routeReportMessage by remember { mutableStateOf("") }
     val reportState by reportsViewModel.uiState.collectAsState()
-    var showStopDialog by remember { mutableStateOf(false) }
 
     // CU-10: estado de favoritos para esta ruta
-    val favoritosState by favoritosViewModel.uiState.collectAsState()
-    val isFavorito     by favoritosViewModel.isCurrentRouteFavorite.collectAsState()
+    val isFavorito by favoritosViewModel.isCurrentRouteFavorite.collectAsState()
 
     // CU-11: estado del estimador de tiempo de traslado
     val routeTimeState by routeTimeViewModel.uiState.collectAsState()
@@ -492,33 +491,44 @@ fun MapDetailView(
 
                 Spacer(Modifier.height(20.dp))
 
-                // ── Sección de Tarifas ──────────────────────────────────────────────
+                // ── Sección de Tarifas ──────────────────────────────────────
                 Card(
                     modifier = Modifier.fillMaxWidth(),
-                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)),
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+                    ),
                     shape = MaterialTheme.shapes.medium
                 ) {
                     Column(modifier = Modifier.padding(12.dp)) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
-                            Icon(Icons.Default.Payments, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(20.dp))
+                            Icon(
+                                Icons.Default.Payments,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(20.dp)
+                            )
                             Spacer(Modifier.width(8.dp))
-                            Text("Costos de Tarifa", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
+                            Text(
+                                "Costos de Tarifa",
+                                style = MaterialTheme.typography.titleSmall,
+                                fontWeight = FontWeight.Bold
+                            )
                         }
                         Spacer(Modifier.height(8.dp))
                         Row(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.SpaceBetween
                         ) {
-                            FarePriceItem("General", selectedRoute?.fare ?: "12.00")
+                            FarePriceItem("General",     selectedRoute?.fare        ?: "12.00")
                             FarePriceItem("Estudiantes", selectedRoute?.fareStudent ?: "7.00")
-                            FarePriceItem("INAPAN", selectedRoute?.fareInapan ?: "7.00")
+                            FarePriceItem("INAPAN",      selectedRoute?.fareInapan  ?: "7.00")
                         }
                     }
                 }
 
                 Spacer(Modifier.height(16.dp))
 
-                // ── CU-11: Card de duración total del trayecto ─────────────────────────
+                // ── CU-11: Card de duración total del trayecto ─────────────
                 RouteTravelTimeCard(state = routeTimeState)
 
                 Spacer(Modifier.height(8.dp))
@@ -526,16 +536,27 @@ fun MapDetailView(
                 InfoItem(
                     icon  = Icons.Default.Timer,
                     label = "Frecuencia Estimada",
-                    value = selectedRoute?.frequency?.let { if (it.isEmpty()) "N/A" else it } ?: "Consultando..."
+                    value = selectedRoute?.frequency
+                        ?.let { if (it.isEmpty()) "N/A" else it }
+                        ?: "Consultando..."
                 )
 
                 Spacer(Modifier.height(24.dp))
-                Text("Reportar cambios en la ruta", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onSurface)
+                Text(
+                    "Reportar cambios en la ruta",
+                    style = MaterialTheme.typography.titleMedium,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
                 Spacer(Modifier.height(8.dp))
                 OutlinedTextField(
                     value = routeReportMessage,
                     onValueChange = { routeReportMessage = it },
-                    placeholder = { Text("Escribe aquí si la ruta cambió...", color = MaterialTheme.colorScheme.onSurfaceVariant) },
+                    placeholder = {
+                        Text(
+                            "Escribe aquí si la ruta cambió...",
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    },
                     modifier = Modifier.fillMaxWidth(),
                     shape = MaterialTheme.shapes.medium,
                     colors = OutlinedTextFieldDefaults.colors(
@@ -550,26 +571,25 @@ fun MapDetailView(
                 )
 
                 if (reportState is com.example.xalabus.ui.viewmodel.ReportUiState.Error) {
-                    Text((reportState as com.example.xalabus.ui.viewmodel.ReportUiState.Error).message, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.labelSmall)
+                    Text(
+                        (reportState as com.example.xalabus.ui.viewmodel.ReportUiState.Error).message,
+                        color = MaterialTheme.colorScheme.error,
+                        style = MaterialTheme.typography.labelSmall
+                    )
                 }
                 if (reportState is com.example.xalabus.ui.viewmodel.ReportUiState.Success) {
-                    Text("¡Reporte de ruta enviado!", color = MaterialTheme.colorScheme.primary, style = MaterialTheme.typography.labelSmall)
+                    Text(
+                        "¡Reporte de ruta enviado!",
+                        color = MaterialTheme.colorScheme.primary,
+                        style = MaterialTheme.typography.labelSmall
+                    )
                 }
 
                 Row(
                     modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
+                    horizontalArrangement = Arrangement.End,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    TextButton(
-                        onClick = { showStopDialog = true },
-                        colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.secondary)
-                    ) {
-                        Icon(Icons.Default.AddLocationAlt, null, Modifier.size(18.dp))
-                        Spacer(Modifier.width(4.dp))
-                        Text("¡Aquí hay una parada!")
-                    }
-
                     Button(
                         onClick = {
                             reportsViewModel.submitRouteReport(parsedRouteId, routeReportMessage)
@@ -578,14 +598,19 @@ fun MapDetailView(
                                 reportsViewModel.resetState()
                             }
                         },
-                        enabled = routeReportMessage.isNotBlank() && reportState !is com.example.xalabus.ui.viewmodel.ReportUiState.Loading,
-                        colors   = ButtonDefaults.buttonColors(
+                        enabled = routeReportMessage.isNotBlank() &&
+                                reportState !is com.example.xalabus.ui.viewmodel.ReportUiState.Loading,
+                        colors = ButtonDefaults.buttonColors(
                             containerColor = MaterialTheme.colorScheme.primary,
                             contentColor   = MaterialTheme.colorScheme.onPrimary
                         )
                     ) {
                         if (reportState is com.example.xalabus.ui.viewmodel.ReportUiState.Loading) {
-                            CircularProgressIndicator(modifier = Modifier.size(16.dp), color = MaterialTheme.colorScheme.onPrimary, strokeWidth = 2.dp)
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(16.dp),
+                                color = MaterialTheme.colorScheme.onPrimary,
+                                strokeWidth = 2.dp
+                            )
                         } else {
                             Icon(Icons.Default.Send, null, Modifier.size(18.dp))
                             Spacer(Modifier.width(8.dp))
@@ -599,9 +624,9 @@ fun MapDetailView(
     ) { innerPadding ->
         Box(modifier = Modifier.padding(innerPadding).fillMaxSize()) {
             MapScreen(
-                fileManager = fileManager,
-                viewModel = viewModel,
-                isDarkMode = isDarkMode,
+                fileManager        = fileManager,
+                viewModel          = viewModel,
+                isDarkMode         = isDarkMode,
                 routeTimeViewModel = routeTimeViewModel
             )
             FilledIconButton(
@@ -614,22 +639,11 @@ fun MapDetailView(
                 Icon(Icons.Default.ArrowBack, "Regresar", tint = MaterialTheme.colorScheme.onSurface)
             }
         }
-
-        if (showStopDialog) {
-            com.example.xalabus.ui.reports.RouteStopDialog(
-                viewModel = reportsViewModel,
-                routeId = parsedRouteId,
-                latitude = 19.543,
-                longitude = -96.927,
-                onDismiss = { showStopDialog = false }
-            )
-        }
     }
 }
 
 /**
  * CU-11: Card compacto que muestra la duración total estimada del trayecto completo.
- * Se calcula automáticamente al entrar a la ruta desde su geometría GeoJSON.
  * Velocidad promedio fija: 32 km/h.
  */
 @Composable
@@ -648,7 +662,6 @@ fun RouteTravelTimeCard(state: RouteTimeUiState) {
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.SpaceBetween
         ) {
-            // Icono + etiqueta
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Icon(
                     Icons.Default.DirectionsBus,
@@ -670,8 +683,6 @@ fun RouteTravelTimeCard(state: RouteTimeUiState) {
                     )
                 }
             }
-
-            // Valor calculado
             when (state) {
                 is RouteTimeUiState.Idle -> {
                     CircularProgressIndicator(
@@ -697,5 +708,54 @@ fun RouteTravelTimeCard(state: RouteTimeUiState) {
                 }
             }
         }
+    }
+}
+
+/** Muestra el precio de una tarifa con etiqueta centrada. */
+@Composable
+fun FarePriceItem(label: String, price: String) {
+    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+        Text(
+            text  = "$$price",
+            style = MaterialTheme.typography.titleMedium,
+            fontWeight = FontWeight.Bold,
+            color = MaterialTheme.colorScheme.primary
+        )
+        Text(
+            text  = label,
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+    }
+}
+
+/** Fila de información con icono, etiqueta y valor. */
+@Composable
+fun InfoItem(icon: ImageVector, label: String, value: String) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 4.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Icon(
+            imageVector        = icon,
+            contentDescription = null,
+            tint               = MaterialTheme.colorScheme.primary,
+            modifier           = Modifier.size(18.dp)
+        )
+        Spacer(Modifier.width(8.dp))
+        Text(
+            text  = label,
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.weight(1f)
+        )
+        Text(
+            text  = value,
+            style = MaterialTheme.typography.bodySmall,
+            fontWeight = FontWeight.Medium,
+            color = MaterialTheme.colorScheme.onSurface
+        )
     }
 }
