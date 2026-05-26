@@ -5,7 +5,6 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AddLocation
 import androidx.compose.material.icons.filled.ArrowBack
-import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -14,7 +13,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
-import com.example.xalabus.data.paradas.Parada
 
 /**
  * CU-12 — Pantalla para registrar una nueva parada de camión.
@@ -22,7 +20,7 @@ import com.example.xalabus.data.paradas.Parada
  *
  * Flujo:
  *  1. El admin ingresa nombre, latitud, longitud y ruta_id.
- *  2. Si hay paradas cercanas → diálogo de advertencia (FA-02).
+ *  2. Si hay parada cercana → error inline (FA-02).
  *  3. Si datos incompletos → error inline (FA-01).
  *  4. Éxito → parada visible para todos los usuarios.
  */
@@ -39,15 +37,13 @@ fun AdminAddStopScreen(
     var longitud by remember { mutableStateOf("") }
     var rutaId   by remember { mutableStateOf("") }
 
+    // Limpiar formulario tras éxito
     LaunchedEffect(uiState) {
-        when (uiState) {
-            is AdminStopUiState.Success -> {
-                nombre   = ""
-                latitud  = ""
-                longitud = ""
-                rutaId   = ""
-            }
-            else -> Unit
+        if (uiState is AdminStopUiState.Success) {
+            nombre   = ""
+            latitud  = ""
+            longitud = ""
+            rutaId   = ""
         }
     }
 
@@ -163,7 +159,7 @@ fun AdminAddStopScreen(
                         )
                     ) {
                         Text(
-                            "✓ Parada guardada exitosamente.",
+                            "\u2713 Parada guardada exitosamente.",
                             modifier = Modifier.padding(12.dp),
                             color    = MaterialTheme.colorScheme.onPrimaryContainer,
                             style    = MaterialTheme.typography.bodySmall

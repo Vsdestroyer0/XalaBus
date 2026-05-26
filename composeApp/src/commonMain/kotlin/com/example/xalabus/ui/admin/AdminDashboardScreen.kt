@@ -1,6 +1,5 @@
 package com.example.xalabus.ui.admin
 
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -14,15 +13,16 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.xalabus.data.paradas.Parada
 import kotlinx.coroutines.launch
 
-private val AdminBg     = Color(0xFF080C14)
-private val AdminText   = Color(0xFFE2E8F0)
-private val AdminAccent = Color(0xFF6366F1)
-private val AdminMuted  = Color(0xFF64748B)
-private val AdminCardBg = Color(0xFF1E293B)
+private val AdminBg      = Color(0xFF080C14)
+private val AdminText    = Color(0xFFE2E8F0)
+private val AdminAccent  = Color(0xFF6366F1)
+private val AdminMuted   = Color(0xFF64748B)
+private val AdminCardBg  = Color(0xFF1E293B)
 private val ApproveGreen = Color(0xFF10B981)
-private val RejectRed   = Color(0xFFEF4444)
+private val RejectRed    = Color(0xFFEF4444)
 
 private enum class AdminScreenDestination { DASHBOARD, STOPS }
 
@@ -34,7 +34,7 @@ fun AdminDashboardScreen(
 ) {
     val stopsViewModel = remember { AdminStopsViewModel() }
     var currentScreen by remember { mutableStateOf(AdminScreenDestination.DASHBOARD) }
-    
+
     val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
     val scope = rememberCoroutineScope()
 
@@ -43,66 +43,66 @@ fun AdminDashboardScreen(
         drawerContent = {
             ModalDrawerSheet(
                 drawerContainerColor = AdminCardBg,
-                drawerContentColor = AdminText
+                drawerContentColor   = AdminText
             ) {
                 Spacer(Modifier.height(16.dp))
                 Text(
                     "Admin XalaBus",
-                    modifier = Modifier.padding(16.dp),
-                    style = MaterialTheme.typography.titleLarge,
-                    color = AdminText,
+                    modifier   = Modifier.padding(16.dp),
+                    style      = MaterialTheme.typography.titleLarge,
+                    color      = AdminText,
                     fontWeight = FontWeight.Bold
                 )
                 HorizontalDivider(color = AdminMuted.copy(alpha = 0.3f))
-                
                 Spacer(Modifier.height(8.dp))
-                
+
                 NavigationDrawerItem(
-                    icon = { Icon(Icons.Default.Dashboard, contentDescription = null) },
-                    label = { Text("Inicio") },
+                    icon     = { Icon(Icons.Default.Dashboard, contentDescription = null) },
+                    label    = { Text("Inicio") },
                     selected = currentScreen == AdminScreenDestination.DASHBOARD,
-                    onClick = {
+                    onClick  = {
                         currentScreen = AdminScreenDestination.DASHBOARD
                         scope.launch { drawerState.close() }
                     },
                     colors = NavigationDrawerItemDefaults.colors(
                         unselectedContainerColor = Color.Transparent,
-                        selectedContainerColor = AdminAccent.copy(alpha = 0.2f),
-                        selectedTextColor = AdminAccent,
-                        selectedIconColor = AdminAccent,
-                        unselectedTextColor = AdminText,
-                        unselectedIconColor = AdminMuted
+                        selectedContainerColor   = AdminAccent.copy(alpha = 0.2f),
+                        selectedTextColor        = AdminAccent,
+                        selectedIconColor        = AdminAccent,
+                        unselectedTextColor      = AdminText,
+                        unselectedIconColor      = AdminMuted
                     ),
                     modifier = Modifier.padding(NavigationDrawerItemDefaults.ItemPadding)
                 )
 
                 NavigationDrawerItem(
-                    icon = { Icon(Icons.Default.AddLocationAlt, contentDescription = null) },
-                    label = { Text("Paradas Sugeridas") },
+                    icon     = { Icon(Icons.Default.AddLocationAlt, contentDescription = null) },
+                    label    = { Text("Paradas Sugeridas") },
                     selected = currentScreen == AdminScreenDestination.STOPS,
-                    onClick = {
+                    onClick  = {
                         currentScreen = AdminScreenDestination.STOPS
                         stopsViewModel.fetchPendingStops()
                         scope.launch { drawerState.close() }
                     },
                     colors = NavigationDrawerItemDefaults.colors(
                         unselectedContainerColor = Color.Transparent,
-                        selectedContainerColor = AdminAccent.copy(alpha = 0.2f),
-                        selectedTextColor = AdminAccent,
-                        selectedIconColor = AdminAccent,
-                        unselectedTextColor = AdminText,
-                        unselectedIconColor = AdminMuted
+                        selectedContainerColor   = AdminAccent.copy(alpha = 0.2f),
+                        selectedTextColor        = AdminAccent,
+                        selectedIconColor        = AdminAccent,
+                        unselectedTextColor      = AdminText,
+                        unselectedIconColor      = AdminMuted
                     ),
                     modifier = Modifier.padding(NavigationDrawerItemDefaults.ItemPadding)
                 )
 
                 Spacer(Modifier.weight(1f))
                 HorizontalDivider(color = AdminMuted.copy(alpha = 0.3f))
+
                 NavigationDrawerItem(
-                    icon = { Icon(Icons.Default.Logout, contentDescription = null) },
-                    label = { Text("Cerrar Sesión") },
+                    icon     = { Icon(Icons.Default.Logout, contentDescription = null) },
+                    label    = { Text("Cerrar Sesi\u00f3n") },
                     selected = false,
-                    onClick = {
+                    onClick  = {
                         scope.launch { drawerState.close() }
                         viewModel.signOut()
                         onSignOut()
@@ -111,7 +111,9 @@ fun AdminDashboardScreen(
                         unselectedTextColor = RejectRed,
                         unselectedIconColor = RejectRed
                     ),
-                    modifier = Modifier.padding(NavigationDrawerItemDefaults.ItemPadding).padding(bottom = 16.dp)
+                    modifier = Modifier
+                        .padding(NavigationDrawerItemDefaults.ItemPadding)
+                        .padding(bottom = 16.dp)
                 )
             }
         }
@@ -119,16 +121,17 @@ fun AdminDashboardScreen(
         Scaffold(
             topBar = {
                 TopAppBar(
-                    title = { 
+                    title = {
                         Text(
-                            text = if (currentScreen == AdminScreenDestination.DASHBOARD) "Dashboard" else "Sugerencias de Paradas",
-                            color = AdminText,
+                            text = if (currentScreen == AdminScreenDestination.DASHBOARD)
+                                "Dashboard" else "Sugerencias de Paradas",
+                            color      = AdminText,
                             fontWeight = FontWeight.Bold
-                        ) 
+                        )
                     },
                     navigationIcon = {
                         IconButton(onClick = { scope.launch { drawerState.open() } }) {
-                            Icon(Icons.Default.Menu, contentDescription = "Menú", tint = AdminText)
+                            Icon(Icons.Default.Menu, contentDescription = "Men\u00fa", tint = AdminText)
                         }
                     },
                     colors = TopAppBarDefaults.topAppBarColors(containerColor = AdminBg)
@@ -138,24 +141,8 @@ fun AdminDashboardScreen(
         ) { padding ->
             Box(modifier = Modifier.fillMaxSize().padding(padding)) {
                 when (currentScreen) {
-                    AdminScreenDestination.DASHBOARD -> AdminMainDashboard(
-                        viewModel = viewModel,
-                        adminBg = AdminBg,
-                        adminText = AdminText,
-                        adminAccent = AdminAccent,
-                        adminMuted = AdminMuted,
-                        adminCardBg = AdminCardBg
-                    )
-                    AdminScreenDestination.STOPS -> AdminStopsList(
-                        viewModel = stopsViewModel,
-                        adminBg = AdminBg,
-                        adminText = AdminText,
-                        adminAccent = AdminAccent,
-                        adminMuted = AdminMuted,
-                        adminCardBg = AdminCardBg,
-                        approveGreen = ApproveGreen,
-                        rejectRed = RejectRed
-                    )
+                    AdminScreenDestination.DASHBOARD -> DashboardContent()
+                    AdminScreenDestination.STOPS     -> AdminStopsContent(stopsViewModel)
                 }
             }
         }
@@ -163,156 +150,135 @@ fun AdminDashboardScreen(
 }
 
 @Composable
-private fun AdminMainDashboard(
-    viewModel: AdminViewModel,
-    adminBg: Color,
-    adminText: Color,
-    adminAccent: Color,
-    adminMuted: Color,
-    adminCardBg: Color
-) {
-    val uiState by viewModel.uiState.collectAsState()
-
+fun DashboardContent() {
     Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(adminBg)
-            .padding(16.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp)
+        modifier              = Modifier.fillMaxSize(),
+        horizontalAlignment   = Alignment.CenterHorizontally,
+        verticalArrangement   = Arrangement.Center
     ) {
+        Icon(
+            Icons.Default.AdminPanelSettings,
+            contentDescription = null,
+            tint     = AdminAccent,
+            modifier = Modifier.size(64.dp)
+        )
+        Spacer(Modifier.height(16.dp))
         Text(
-            "Panel de Administración",
-            color = adminText,
-            fontSize = 22.sp,
+            "Bienvenido al Panel de Control",
+            color      = AdminText,
+            fontSize   = 20.sp,
             fontWeight = FontWeight.Bold
         )
         Text(
-            "Gestiona el sistema XalaBus",
-            color = adminMuted,
+            "Selecciona una opci\u00f3n del men\u00fa lateral.",
+            color    = AdminMuted,
             fontSize = 14.sp
         )
-
-        when (val s = uiState) {
-            is AdminUiState.Loading -> {
-                Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    CircularProgressIndicator(color = adminAccent)
-                }
-            }
-            is AdminUiState.Error -> {
-                Card(
-                    colors = CardDefaults.cardColors(containerColor = Color(0xFF3B0000)),
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Text(
-                        s.message,
-                        modifier = Modifier.padding(12.dp),
-                        color = Color(0xFFFF8A80)
-                    )
-                }
-            }
-            else -> {
-                Card(
-                    modifier = Modifier.fillMaxWidth(),
-                    colors = CardDefaults.cardColors(containerColor = adminCardBg)
-                ) {
-                    Column(Modifier.padding(16.dp)) {
-                        Text("Sistema activo", color = adminText, fontWeight = FontWeight.Bold)
-                        Spacer(Modifier.height(4.dp))
-                        Text("Usa el menú lateral para navegar entre secciones.", color = adminMuted, fontSize = 13.sp)
-                    }
-                }
-            }
-        }
     }
 }
 
 @Composable
-private fun AdminStopsList(
-    viewModel: AdminStopsViewModel,
-    adminBg: Color,
-    adminText: Color,
-    adminAccent: Color,
-    adminMuted: Color,
-    adminCardBg: Color,
-    approveGreen: Color,
-    rejectRed: Color
-) {
+fun AdminStopsContent(viewModel: AdminStopsViewModel) {
     val uiState by viewModel.uiState.collectAsState()
 
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(adminBg)
-            .padding(16.dp)
-    ) {
-        when (val s = uiState) {
-            is AdminStopsUiState.Loading -> {
-                Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    CircularProgressIndicator(color = adminAccent)
-                }
+    when (val s = uiState) {
+        is AdminStopsUiState.Loading -> {
+            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                CircularProgressIndicator(color = AdminAccent)
             }
-            is AdminStopsUiState.Error -> {
-                Card(
-                    colors = CardDefaults.cardColors(containerColor = Color(0xFF3B0000)),
-                    modifier = Modifier.fillMaxWidth()
+        }
+        is AdminStopsUiState.Error -> {
+            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                Text(
+                    text     = s.message,
+                    color    = RejectRed,
+                    modifier = Modifier.padding(16.dp)
+                )
+            }
+        }
+        is AdminStopsUiState.Success -> {
+            val stops = s.stops
+            if (stops.isEmpty()) {
+                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    Text("No hay paradas pendientes por revisar.", color = AdminMuted)
+                }
+            } else {
+                LazyColumn(
+                    contentPadding      = PaddingValues(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
-                    Text(
-                        s.message,
-                        modifier = Modifier.padding(12.dp),
-                        color = Color(0xFFFF8A80)
+                    items(stops) { stop ->
+                        StopSuggestionCard(
+                            stop       = stop,
+                            onApprove  = { viewModel.approveStop(stop) },
+                            onReject   = { viewModel.rejectStop(stop) }
+                        )
+                    }
+                }
+            }
+        }
+        else -> Unit
+    }
+}
+
+@Composable
+private fun StopSuggestionCard(
+    stop: Parada,
+    onApprove: () -> Unit,
+    onReject: () -> Unit
+) {
+    Card(
+        colors    = CardDefaults.cardColors(containerColor = AdminCardBg),
+        elevation = CardDefaults.cardElevation(defaultElevation = 4.dp),
+        modifier  = Modifier.fillMaxWidth()
+    ) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Text(
+                stop.nombre,
+                color      = AdminText,
+                fontWeight = FontWeight.Bold,
+                fontSize   = 16.sp
+            )
+            Spacer(Modifier.height(4.dp))
+            Text(
+                "Ruta: ${stop.rutaId}",
+                color    = AdminAccent,
+                fontSize = 13.sp
+            )
+            Text(
+                "Coordenadas: ${stop.latitud}, ${stop.longitud}",
+                color    = AdminMuted,
+                fontSize = 12.sp
+            )
+
+            Spacer(Modifier.height(12.dp))
+
+            Row(
+                modifier              = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.End,
+                verticalAlignment     = Alignment.CenterVertically
+            ) {
+                TextButton(
+                    onClick = onReject,
+                    colors  = ButtonDefaults.textButtonColors(contentColor = RejectRed)
+                ) {
+                    Icon(Icons.Default.Close, null, Modifier.size(18.dp))
+                    Spacer(Modifier.width(4.dp))
+                    Text("Rechazar")
+                }
+
+                Spacer(Modifier.width(8.dp))
+
+                Button(
+                    onClick = onApprove,
+                    colors  = ButtonDefaults.buttonColors(
+                        containerColor = ApproveGreen,
+                        contentColor   = Color.White
                     )
-                }
-            }
-            is AdminStopsUiState.Success -> {
-                if (s.stops.isEmpty()) {
-                    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                            Icon(
-                                Icons.Default.CheckCircle,
-                                contentDescription = null,
-                                tint = approveGreen,
-                                modifier = Modifier.size(48.dp)
-                            )
-                            Spacer(Modifier.height(8.dp))
-                            Text("No hay sugerencias pendientes", color = adminMuted)
-                        }
-                    }
-                } else {
-                    LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        items(s.stops) { stop ->
-                            Card(
-                                modifier = Modifier.fillMaxWidth(),
-                                colors = CardDefaults.cardColors(containerColor = adminCardBg)
-                            ) {
-                                Column(Modifier.padding(12.dp)) {
-                                    Text(stop.nombre, color = adminText, fontWeight = FontWeight.Bold)
-                                    Text(
-                                        "Lat: ${stop.latitud}  Lon: ${stop.longitud}",
-                                        color = adminMuted,
-                                        fontSize = 12.sp
-                                    )
-                                    Spacer(Modifier.height(8.dp))
-                                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                        Button(
-                                            onClick = { viewModel.approveStop(stop) },
-                                            colors = ButtonDefaults.buttonColors(containerColor = approveGreen),
-                                            modifier = Modifier.weight(1f)
-                                        ) { Text("Aprobar", fontSize = 12.sp) }
-                                        OutlinedButton(
-                                            onClick = { viewModel.rejectStop(stop) },
-                                            border = androidx.compose.foundation.BorderStroke(1.dp, rejectRed),
-                                            modifier = Modifier.weight(1f)
-                                        ) { Text("Rechazar", color = rejectRed, fontSize = 12.sp) }
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-            else -> {
-                Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    Text("Cargando sugerencias...", color = adminMuted)
+                ) {
+                    Icon(Icons.Default.Check, null, Modifier.size(18.dp))
+                    Spacer(Modifier.width(4.dp))
+                    Text("Aprobar")
                 }
             }
         }
