@@ -598,7 +598,12 @@ fun MapDetailView(
         }
     ) { innerPadding ->
         Box(modifier = Modifier.padding(innerPadding).fillMaxSize()) {
-            MapScreen(fileManager = fileManager, viewModel = viewModel, isDarkMode = isDarkMode)
+            MapScreen(
+                fileManager = fileManager,
+                viewModel = viewModel,
+                isDarkMode = isDarkMode,
+                routeTimeViewModel = routeTimeViewModel
+            )
             FilledIconButton(
                 onClick  = onBack,
                 modifier = Modifier.padding(16.dp).size(48.dp).align(Alignment.TopStart),

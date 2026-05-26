@@ -7,13 +7,15 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import com.example.xalabus.ui.viewmodel.RouteViewModel
+import com.example.xalabus.ui.viewmodel.RouteTimeViewModel
 import com.example.xalabus.core.util.MapFileManager
 
 @Composable
 actual fun MapScreen(
     fileManager: MapFileManager,
     viewModel: RouteViewModel,
-    isDarkMode: Boolean
+    isDarkMode: Boolean,
+    routeTimeViewModel: RouteTimeViewModel
 ) {
     Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
         Text("Map not yet implemented for iOS")

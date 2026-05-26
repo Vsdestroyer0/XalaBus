@@ -31,6 +31,9 @@ class RouteViewModel(
     private val _selectedRoute = MutableStateFlow<RouteEntity?>(null)
     val selectedRoute: StateFlow<RouteEntity?> = _selectedRoute
 
+    private val _selectedRouteId = MutableStateFlow("")
+    val selectedRouteId: StateFlow<String> = _selectedRouteId
+
     private val _selectedRoutePoints = MutableStateFlow<List<List<List<Double>>>>(emptyList())
     val selectedRoutePoints: StateFlow<List<List<List<Double>>>> = _selectedRoutePoints
 
@@ -153,6 +156,7 @@ class RouteViewModel(
         viewModelScope.launch {
             try {
                 _selectedRoute.value = _allRoutes.value.find { it.id == routeId }
+                _selectedRouteId.value = routeId
 
                 // Solo recuperamos la geometría (el dibujo de la línea en el mapa)
                 _selectedRoutePoints.value = getRoutePoints(routeId)
