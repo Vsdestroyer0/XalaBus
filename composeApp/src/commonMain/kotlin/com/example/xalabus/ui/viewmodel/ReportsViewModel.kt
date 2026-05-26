@@ -2,108 +2,106 @@ package com.example.xalabus.ui.viewmodel
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.example.xalabus.core.util.ErrorMapper
 import com.example.xalabus.data.SupabaseClientProvider
-import com.example.xalabus.data.reports.GeneralReport
-import com.example.xalabus.data.reports.ReportsRepository
-import com.example.xalabus.data.reports.RouteReport
-import com.example.xalabus.data.reports.RouteStop
 import io.github.jan.supabase.auth.auth
+import io.github.jan.supabase.postgrest.postgrest
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 
+/** Estados de la UI de reportes generales y paradas */
 sealed class ReportUiState {
-    object Idle : ReportUiState()
+    object Idle    : ReportUiState()
     object Loading : ReportUiState()
     object Success : ReportUiState()
     data class Error(val message: String) : ReportUiState()
 }
 
 class ReportsViewModel : ViewModel() {
-    private val repository = ReportsRepository()
+
     private val supabase = SupabaseClientProvider.client
 
     private val _uiState = MutableStateFlow<ReportUiState>(ReportUiState.Idle)
     val uiState: StateFlow<ReportUiState> = _uiState.asStateFlow()
 
-    private fun getCurrentUserId(): String? {
-        return supabase.auth.currentSessionOrNull()?.user?.id
-    }
-
+    /** Envía un reporte general (quejas, sugerencias, etc.) */
     fun submitGeneralReport(message: String) {
         if (message.isBlank()) {
             _uiState.value = ReportUiState.Error("El mensaje no puede estar vacío.")
             return
         }
-        
-        val userId = getCurrentUserId()
-        if (userId == null) {
-            _uiState.value = ReportUiState.Error("Debes iniciar sesión para reportar.")
-            return
-        }
-
         _uiState.value = ReportUiState.Loading
         viewModelScope.launch {
             try {
-                repository.sendGeneralReport(GeneralReport(userId = userId, message = message))
+                val userId = supabase.auth.currentUserOrNull()?.id ?: "anonymous"
+                supabase.postgrest
+                    .from("general_reports")
+                    .insert(mapOf(
+                        "user_id" to userId,
+                        "message" to message
+                    ))
                 _uiState.value = ReportUiState.Success
             } catch (e: Exception) {
-                _uiState.value = ReportUiState.Error("Error al enviar reporte: ${e.message}")
+                _uiState.value = ReportUiState.Error(
+                    ErrorMapper.toUserMessage(e, "al enviar el reporte")
+                )
             }
         }
     }
 
+    /** Envía un reporte de cambio sobre una ruta específica */
     fun submitRouteReport(routeId: Int, message: String) {
         if (message.isBlank()) {
             _uiState.value = ReportUiState.Error("El mensaje no puede estar vacío.")
             return
         }
-
-        val userId = getCurrentUserId()
-        if (userId == null) {
-            _uiState.value = ReportUiState.Error("Debes iniciar sesión para reportar.")
-            return
-        }
-
         _uiState.value = ReportUiState.Loading
         viewModelScope.launch {
             try {
-                repository.sendRouteReport(RouteReport(userId = userId, routeId = routeId, message = message))
+                val userId = supabase.auth.currentUserOrNull()?.id ?: "anonymous"
+                supabase.postgrest
+                    .from("route_reports")
+                    .insert(mapOf(
+                        "user_id" to userId,
+                        "route_id" to routeId, 
+                        "message" to message
+                    ))
                 _uiState.value = ReportUiState.Success
             } catch (e: Exception) {
-                _uiState.value = ReportUiState.Error("Error al enviar reporte: ${e.message}")
+                _uiState.value = ReportUiState.Error(
+                    ErrorMapper.toUserMessage(e, "al enviar el reporte")
+                )
             }
         }
     }
 
-    fun submitRouteStop(routeId: Int, description: String, lat: Double, lng: Double) {
+    /** Envía una sugerencia de parada de camión */
+    fun submitRouteStop(routeId: Int, description: String, latitude: Double, longitude: Double) {
         if (description.isBlank()) {
             _uiState.value = ReportUiState.Error("La descripción no puede estar vacía.")
             return
         }
-
-        val userId = getCurrentUserId()
-        if (userId == null) {
-            _uiState.value = ReportUiState.Error("Debes iniciar sesión para sugerir paradas.")
-            return
-        }
-
         _uiState.value = ReportUiState.Loading
         viewModelScope.launch {
             try {
-                repository.suggestRouteStop(
-                    RouteStop(
-                        userId = userId,
-                        routeId = routeId,
-                        description = description,
-                        latitude = lat,
-                        longitude = lng
-                    )
-                )
+                val userId = supabase.auth.currentUserOrNull()?.id ?: "anonymous"
+                supabase.postgrest
+                    .from("route_stops")
+                    .insert(mapOf(
+                        "user_id" to userId,
+                        "route_id"  to routeId,
+                        "description" to description,
+                        "latitude"   to latitude,
+                        "longitude"  to longitude,
+                        "status" to "pending"
+                    ))
                 _uiState.value = ReportUiState.Success
             } catch (e: Exception) {
-                _uiState.value = ReportUiState.Error("Error al sugerir parada: ${e.message}")
+                _uiState.value = ReportUiState.Error(
+                    ErrorMapper.toUserMessage(e, "al sugerir la parada")
+                )
             }
         }
     }

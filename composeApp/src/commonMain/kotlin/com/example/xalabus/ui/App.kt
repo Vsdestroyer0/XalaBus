@@ -1,6 +1,7 @@
 package com.example.xalabus.ui
 
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
@@ -13,6 +14,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -23,13 +25,20 @@ import com.example.xalabus.ui.admin.AdminDashboardScreen
 import com.example.xalabus.ui.admin.AdminLoginScreen
 import com.example.xalabus.ui.admin.AdminViewModel
 import com.example.xalabus.ui.auth.AuthViewModel
+import com.example.xalabus.ui.auth.ForgotPasswordViewModel
+import com.example.xalabus.ui.auth.ForgotPasswordScreen
 import com.example.xalabus.ui.auth.LoginScreen
 import com.example.xalabus.ui.auth.RegisterScreen
+import com.example.xalabus.ui.home.FavoritosScreen
 import com.example.xalabus.ui.home.HomeScreen
 import com.example.xalabus.ui.map.MapScreen
 import com.example.xalabus.ui.viewmodel.RouteViewModel
 import com.example.xalabus.ui.onboarding.OnboardingScreen
 import com.example.xalabus.core.prefs.OnboardingPreferences
+import com.example.xalabus.ui.viewmodel.FavoritosViewModel
+import com.example.xalabus.ui.viewmodel.IncidentViewModel
+import com.example.xalabus.ui.viewmodel.RouteTimeViewModel
+import com.example.xalabus.ui.viewmodel.RouteTimeUiState
 import kotlinx.coroutines.launch
 import org.jetbrains.compose.resources.ExperimentalResourceApi
 import org.jetbrains.compose.resources.decodeToImageBitmap
@@ -37,7 +46,9 @@ import xalabus.composeapp.generated.resources.*
 import xalabus.composeapp.generated.resources.Res
 
 private enum class AppDestination { AUTH, MAIN, ADMIN_DASHBOARD }
-private enum class AuthScreen     { LOGIN, REGISTER }
+
+// CU-03: agregado FORGOT_PASSWORD al enum de pantallas de auth
+private enum class AuthScreen { LOGIN, REGISTER, FORGOT_PASSWORD }
 
 
 @Composable
@@ -61,6 +72,14 @@ fun App(
     val authViewModel  = remember { AuthViewModel() }
     val adminViewModel = remember { AdminViewModel() }
     val reportsViewModel = remember { com.example.xalabus.ui.viewmodel.ReportsViewModel() }
+    // CU-03: ViewModel de recuperación de contraseña
+    val forgotPasswordViewModel = remember { ForgotPasswordViewModel() }
+    // CU-10: ViewModel de favoritos
+    val favoritosViewModel = remember { FavoritosViewModel() }
+    // CU-11: ViewModel de tiempo estimado de traslado (cálculo fijo desde geometría)
+    val routeTimeViewModel = remember { RouteTimeViewModel() }
+    // CU-13: ViewModel de incidentes GPS
+    val incidentViewModel = remember { IncidentViewModel() }
 
     val systemDark  = isSystemInDarkTheme()
     var isDarkMode  by remember { mutableStateOf(systemDark) }
@@ -68,7 +87,7 @@ fun App(
 
     var isAuthenticated by remember { mutableStateOf(authViewModel.isSessionActive()) }
     var destination by remember {
-        mutableStateOf(AppDestination.MAIN) // Iniciamos en MAIN para que sea offline-first
+        mutableStateOf(AppDestination.MAIN)
     }
     var currentAuthScreen by remember { mutableStateOf(AuthScreen.LOGIN) }
 
@@ -78,17 +97,24 @@ fun App(
                 AppDestination.AUTH -> when (currentAuthScreen) {
                     AuthScreen.LOGIN -> LoginScreen(
                         viewModel            = authViewModel,
-                        onLoginSuccess       = { 
+                        onLoginSuccess       = {
                             isAuthenticated = true
-                            destination = AppDestination.MAIN 
+                            destination = AppDestination.MAIN
                         },
                         onNavigateToRegister = { currentAuthScreen = AuthScreen.REGISTER },
-                        onBack               = { destination = AppDestination.MAIN }
+                        onBack               = { destination = AppDestination.MAIN },
+                        onForgotPassword     = { currentAuthScreen = AuthScreen.FORGOT_PASSWORD }
                     )
                     AuthScreen.REGISTER -> RegisterScreen(
                         viewModel         = authViewModel,
                         onRegisterSuccess = { currentAuthScreen = AuthScreen.LOGIN },
                         onNavigateToLogin = { currentAuthScreen = AuthScreen.LOGIN }
+                    )
+                    // CU-03
+                    AuthScreen.FORGOT_PASSWORD -> ForgotPasswordScreen(
+                        viewModel = forgotPasswordViewModel,
+                        onSuccess = { currentAuthScreen = AuthScreen.LOGIN },
+                        onBack    = { currentAuthScreen = AuthScreen.LOGIN }
                     )
                 }
 
@@ -99,7 +125,7 @@ fun App(
                     isDarkMode       = isDarkMode,
                     isAuthenticated  = isAuthenticated,
                     onToggleDarkMode = { isDarkMode = !isDarkMode },
-                    onSignInRequest  = { 
+                    onSignInRequest  = {
                         destination = AppDestination.AUTH
                         currentAuthScreen = AuthScreen.LOGIN
                     },
@@ -107,7 +133,10 @@ fun App(
                         authViewModel.signOut()
                         isAuthenticated = false
                     },
-                    reportsViewModel = reportsViewModel
+                    reportsViewModel   = reportsViewModel,
+                    favoritosViewModel = favoritosViewModel,
+                    incidentViewModel  = incidentViewModel,
+                    routeTimeViewModel = routeTimeViewModel
                 )
 
                 AppDestination.ADMIN_DASHBOARD -> AdminDashboardScreen(
@@ -132,7 +161,10 @@ private fun MainAppContent(
     onToggleDarkMode: () -> Unit,
     onSignInRequest: () -> Unit,
     onSignOut: () -> Unit,
-    reportsViewModel: com.example.xalabus.ui.viewmodel.ReportsViewModel
+    reportsViewModel: com.example.xalabus.ui.viewmodel.ReportsViewModel,
+    favoritosViewModel: FavoritosViewModel,
+    incidentViewModel: IncidentViewModel,
+    routeTimeViewModel: RouteTimeViewModel
 ) {
     LaunchedEffect(Unit) { viewModel.initializeData() }
 
@@ -140,6 +172,10 @@ private fun MainAppContent(
     var showMap by remember { mutableStateOf(false) }
     var showOnboarding by remember { mutableStateOf(!OnboardingPreferences.isOnboardingCompleted()) }
     var showGeneralReport by remember { mutableStateOf(false) }
+    // CU-13: controla la pantalla de reporte de incidente con GPS
+    var showIncidentReport by remember { mutableStateOf(false) }
+    // CU-10 (extensión): controla la pantalla de rutas favoritas del drawer
+    var showFavoritos by remember { mutableStateOf(false) }
 
     val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
     val scope       = rememberCoroutineScope()
@@ -152,6 +188,24 @@ private fun MainAppContent(
                 OnboardingPreferences.markOnboardingCompleted()
                 showOnboarding = false
             }
+        )
+    } else if (showIncidentReport) {
+        // CU-13: pantalla completa de reporte de incidente con GPS
+        com.example.xalabus.ui.reports.ReportIncidentScreen(
+            viewModel = incidentViewModel,
+            onDismiss = { showIncidentReport = false }
+        )
+    } else if (showFavoritos) {
+        // CU-10 (extensión): pantalla completa de rutas favoritas del usuario
+        FavoritosScreen(
+            favoritosViewModel = favoritosViewModel,
+            routeViewModel     = viewModel,
+            onNavigateToRoute  = { routeId ->
+                viewModel.selectRoute(routeId)
+                showFavoritos = false
+                showMap = true
+            },
+            onDismiss = { showFavoritos = false }
         )
     } else {
         ModalNavigationDrawer(
@@ -199,6 +253,35 @@ private fun MainAppContent(
                     )
 
                     if (isAuthenticated) {
+
+                        // CU-10 (extensión): ver rutas favoritas guardadas
+                        NavigationDrawerItem(
+                            icon     = { Icon(Icons.Default.Star, contentDescription = null) },
+                            label    = { Text("Mis Rutas Favoritas") },
+                            selected = false,
+                            onClick  = {
+                                scope.launch { drawerState.close() }
+                                showFavoritos = true
+                            },
+                            colors = NavigationDrawerItemDefaults.colors(
+                                unselectedTextColor = MaterialTheme.colorScheme.primary,
+                                unselectedIconColor = MaterialTheme.colorScheme.primary
+                            ),
+                            modifier = Modifier.padding(NavigationDrawerItemDefaults.ItemPadding)
+                        )
+
+                        // CU-13: opción de reportar incidente con GPS
+                        NavigationDrawerItem(
+                            icon   = { Icon(Icons.Default.ReportProblem, contentDescription = null) },
+                            label  = { Text("Reportar Incidente") },
+                            selected = false,
+                            onClick  = {
+                                scope.launch { drawerState.close() }
+                                showIncidentReport = true
+                            },
+                            modifier = Modifier.padding(NavigationDrawerItemDefaults.ItemPadding)
+                        )
+
                         NavigationDrawerItem(
                             icon   = { Icon(Icons.Default.Feedback, contentDescription = null) },
                             label  = { Text("Reporte General") },
@@ -261,11 +344,17 @@ private fun MainAppContent(
                 )
             } else {
                 MapDetailView(
-                    fileManager = fileManager,
-                    viewModel   = viewModel,
-                    reportsViewModel = reportsViewModel,
-                    isDarkMode  = isDarkMode,
-                    onBack      = { showMap = false }
+                    fileManager        = fileManager,
+                    viewModel          = viewModel,
+                    reportsViewModel   = reportsViewModel,
+                    favoritosViewModel = favoritosViewModel,
+                    routeTimeViewModel = routeTimeViewModel,
+                    isDarkMode         = isDarkMode,
+                    isAuthenticated    = isAuthenticated,
+                    onBack             = {
+                        routeTimeViewModel.resetState()
+                        showMap = false
+                    }
                 )
             }
         }
@@ -285,17 +374,40 @@ fun MapDetailView(
     fileManager: MapFileManager,
     viewModel: RouteViewModel,
     reportsViewModel: com.example.xalabus.ui.viewmodel.ReportsViewModel,
+    favoritosViewModel: FavoritosViewModel,
+    routeTimeViewModel: RouteTimeViewModel,
     isDarkMode: Boolean,
+    isAuthenticated: Boolean,
     onBack: () -> Unit
 ) {
     val selectedRoute  by viewModel.selectedRoute.collectAsState()
+    val routePoints    by viewModel.selectedRoutePoints.collectAsState()
     val scaffoldState = rememberBottomSheetScaffoldState()
     val routeId       = selectedRoute?.id ?: ""
     val parsedRouteId = routeId.toIntOrNull() ?: 0
 
     var routeReportMessage by remember { mutableStateOf("") }
     val reportState by reportsViewModel.uiState.collectAsState()
-    var showStopDialog by remember { mutableStateOf(false) }
+
+    // CU-10: estado de favoritos para esta ruta
+    val isFavorito by favoritosViewModel.isCurrentRouteFavorite.collectAsState()
+
+    // CU-11: estado del estimador de tiempo de traslado
+    val routeTimeState by routeTimeViewModel.uiState.collectAsState()
+
+    // Cargar estado de favorito al seleccionar ruta
+    LaunchedEffect(routeId) {
+        if (routeId.isNotEmpty()) {
+            favoritosViewModel.checkIfFavorite(routeId)
+        }
+    }
+
+    // CU-11: calcular duración en cuanto llegan los puntos de la ruta
+    LaunchedEffect(routePoints) {
+        if (routePoints.isNotEmpty()) {
+            routeTimeViewModel.calculateFromGeometry(routePoints)
+        }
+    }
 
     BottomSheetScaffold(
         scaffoldState       = scaffoldState,
@@ -307,17 +419,45 @@ fun MapDetailView(
                     .fillMaxWidth()
                     .padding(horizontal = 20.dp, vertical = 10.dp)
             ) {
-                Text(
-                    selectedRoute?.name ?: "Ruta Desconocida",
-                    style       = MaterialTheme.typography.headlineSmall,
-                    fontWeight  = FontWeight.Bold,
-                    color       = MaterialTheme.colorScheme.onSurface
-                )
-                Text(
-                    "Xalapa, Veracruz",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
+                // ── Encabezado con nombre de ruta y botón de favorito (CU-10) ──
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            selectedRoute?.name ?: "Ruta Desconocida",
+                            style       = MaterialTheme.typography.headlineSmall,
+                            fontWeight  = FontWeight.Bold,
+                            color       = MaterialTheme.colorScheme.onSurface
+                        )
+                        Text(
+                            "Xalapa, Veracruz",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                    // CU-10: Botón favorito (solo si el usuario está autenticado)
+                    if (isAuthenticated) {
+                        IconButton(
+                            onClick = {
+                                if (isFavorito) {
+                                    favoritosViewModel.removeFromFavorites(routeId)
+                                } else {
+                                    favoritosViewModel.addToFavorites(routeId)
+                                }
+                            }
+                        ) {
+                            Icon(
+                                imageVector = if (isFavorito) Icons.Default.Star else Icons.Default.StarBorder,
+                                contentDescription = if (isFavorito) "Quitar de favoritos" else "Agregar a favoritos",
+                                tint = if (isFavorito) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
+                }
+
                 Spacer(Modifier.height(16.dp))
 
                 val formattedId = routeId.padStart(3, '0')
@@ -338,7 +478,10 @@ fun MapDetailView(
                     shape     = MaterialTheme.shapes.large,
                     elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
                 ) {
-                    Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
+                    Box(
+                        contentAlignment = Alignment.Center,
+                        modifier = Modifier.fillMaxSize()
+                    ) {
                         if (imageBitmap != null) {
                             Image(
                                 bitmap       = imageBitmap!!,
@@ -346,51 +489,104 @@ fun MapDetailView(
                                 modifier     = Modifier.fillMaxSize(),
                                 contentScale = ContentScale.Crop
                             )
-                        } else { DefaultPlaceholder() }
+                        } else {
+                            // Placeholder cuando no hay imagen disponible
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .background(MaterialTheme.colorScheme.surfaceVariant),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Column(
+                                    horizontalAlignment = Alignment.CenterHorizontally,
+                                    verticalArrangement = Arrangement.Center
+                                ) {
+                                    Icon(
+                                        Icons.Default.DirectionsBus,
+                                        contentDescription = null,
+                                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        modifier = Modifier.size(40.dp)
+                                    )
+                                    Spacer(Modifier.height(4.dp))
+                                    Text(
+                                        "Ruta $formattedId",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
+                            }
+                        }
                     }
                 }
 
                 Spacer(Modifier.height(20.dp))
-                // Sección de Tarifas
+
+                // ── Sección de Tarifas ────────────────────────────────────────────
                 Card(
                     modifier = Modifier.fillMaxWidth(),
-                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)),
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+                    ),
                     shape = MaterialTheme.shapes.medium
                 ) {
                     Column(modifier = Modifier.padding(12.dp)) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
-                            Icon(Icons.Default.Payments, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(20.dp))
+                            Icon(
+                                Icons.Default.Payments,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(20.dp)
+                            )
                             Spacer(Modifier.width(8.dp))
-                            Text("Costos de Tarifa", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
+                            Text(
+                                "Costos de Tarifa",
+                                style = MaterialTheme.typography.titleSmall,
+                                fontWeight = FontWeight.Bold
+                            )
                         }
                         Spacer(Modifier.height(8.dp))
                         Row(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.SpaceBetween
                         ) {
-                            FarePriceItem("General", selectedRoute?.fare ?: "12.00")
+                            FarePriceItem("General",     selectedRoute?.fare        ?: "12.00")
                             FarePriceItem("Estudiantes", selectedRoute?.fareStudent ?: "7.00")
-                            FarePriceItem("INAPAN", selectedRoute?.fareInapan ?: "7.00")
+                            FarePriceItem("INAPAN",      selectedRoute?.fareInapan  ?: "7.00")
                         }
                     }
                 }
 
                 Spacer(Modifier.height(16.dp))
-                
-                // Info adicional (Frecuencia)
+
+                // ── CU-11: Card de duración total del trayecto ─────────────────
+                RouteTravelTimeCard(state = routeTimeState)
+
+                Spacer(Modifier.height(8.dp))
+
                 InfoItem(
                     icon  = Icons.Default.Timer,
                     label = "Frecuencia Estimada",
-                    value = selectedRoute?.frequency?.let { if (it.isEmpty()) "N/A" else it } ?: "Consultando..."
+                    value = selectedRoute?.frequency
+                        ?.let { if (it.isEmpty()) "N/A" else it }
+                        ?: "Consultando..."
                 )
 
                 Spacer(Modifier.height(24.dp))
-                Text("Reportar cambios en la ruta", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onSurface)
+                Text(
+                    "Reportar cambios en la ruta",
+                    style = MaterialTheme.typography.titleMedium,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
                 Spacer(Modifier.height(8.dp))
                 OutlinedTextField(
-                    value = routeReportMessage, 
+                    value = routeReportMessage,
                     onValueChange = { routeReportMessage = it },
-                    placeholder = { Text("Escribe aquí si la ruta cambió...", color = MaterialTheme.colorScheme.onSurfaceVariant) },
+                    placeholder = {
+                        Text(
+                            "Escribe aquí si la ruta cambió...",
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    },
                     modifier = Modifier.fillMaxWidth(),
                     shape = MaterialTheme.shapes.medium,
                     colors = OutlinedTextFieldDefaults.colors(
@@ -403,44 +599,48 @@ fun MapDetailView(
                         cursorColor             = MaterialTheme.colorScheme.primary,
                     )
                 )
-                
+
                 if (reportState is com.example.xalabus.ui.viewmodel.ReportUiState.Error) {
-                    Text((reportState as com.example.xalabus.ui.viewmodel.ReportUiState.Error).message, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.labelSmall)
+                    Text(
+                        (reportState as com.example.xalabus.ui.viewmodel.ReportUiState.Error).message,
+                        color = MaterialTheme.colorScheme.error,
+                        style = MaterialTheme.typography.labelSmall
+                    )
                 }
                 if (reportState is com.example.xalabus.ui.viewmodel.ReportUiState.Success) {
-                    Text("¡Reporte de ruta enviado!", color = MaterialTheme.colorScheme.primary, style = MaterialTheme.typography.labelSmall)
+                    Text(
+                        "¡Reporte de ruta enviado!",
+                        color = MaterialTheme.colorScheme.primary,
+                        style = MaterialTheme.typography.labelSmall
+                    )
                 }
 
                 Row(
                     modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
+                    horizontalArrangement = Arrangement.End,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    TextButton(
-                        onClick = { showStopDialog = true },
-                        colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.secondary)
-                    ) {
-                        Icon(Icons.Default.AddLocationAlt, null, Modifier.size(18.dp))
-                        Spacer(Modifier.width(4.dp))
-                        Text("¡Aquí hay una parada!")
-                    }
-
                     Button(
-                        onClick = { 
+                        onClick = {
                             reportsViewModel.submitRouteReport(parsedRouteId, routeReportMessage)
                             if (reportState is com.example.xalabus.ui.viewmodel.ReportUiState.Success) {
                                 routeReportMessage = ""
                                 reportsViewModel.resetState()
                             }
                         },
-                        enabled = routeReportMessage.isNotBlank() && reportState !is com.example.xalabus.ui.viewmodel.ReportUiState.Loading,
-                        colors   = ButtonDefaults.buttonColors(
+                        enabled = routeReportMessage.isNotBlank() &&
+                                reportState !is com.example.xalabus.ui.viewmodel.ReportUiState.Loading,
+                        colors = ButtonDefaults.buttonColors(
                             containerColor = MaterialTheme.colorScheme.primary,
                             contentColor   = MaterialTheme.colorScheme.onPrimary
                         )
                     ) {
                         if (reportState is com.example.xalabus.ui.viewmodel.ReportUiState.Loading) {
-                            CircularProgressIndicator(modifier = Modifier.size(16.dp), color = MaterialTheme.colorScheme.onPrimary, strokeWidth = 2.dp)
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(16.dp),
+                                color = MaterialTheme.colorScheme.onPrimary,
+                                strokeWidth = 2.dp
+                            )
                         } else {
                             Icon(Icons.Default.Send, null, Modifier.size(18.dp))
                             Spacer(Modifier.width(8.dp))
@@ -453,7 +653,12 @@ fun MapDetailView(
         }
     ) { innerPadding ->
         Box(modifier = Modifier.padding(innerPadding).fillMaxSize()) {
-            MapScreen(fileManager = fileManager, viewModel = viewModel, isDarkMode = isDarkMode)
+            MapScreen(
+                fileManager        = fileManager,
+                viewModel          = viewModel,
+                isDarkMode         = isDarkMode,
+                routeTimeViewModel = routeTimeViewModel
+            )
             FilledIconButton(
                 onClick  = onBack,
                 modifier = Modifier.padding(16.dp).size(48.dp).align(Alignment.TopStart),
@@ -464,44 +669,123 @@ fun MapDetailView(
                 Icon(Icons.Default.ArrowBack, "Regresar", tint = MaterialTheme.colorScheme.onSurface)
             }
         }
-        
-        if (showStopDialog) {
-            // TODO: Obtain real map center coordinates from MapLibre
-            com.example.xalabus.ui.reports.RouteStopDialog(
-                viewModel = reportsViewModel,
-                routeId = parsedRouteId,
-                latitude = 19.543, // Default Xalapa coord for now
-                longitude = -96.927,
-                onDismiss = { showStopDialog = false }
-            )
+    }
+}
+
+/**
+ * CU-11: Card compacto que muestra la duración total estimada del trayecto completo.
+ * Velocidad promedio fija: 32 km/h.
+ */
+@Composable
+fun RouteTravelTimeCard(state: RouteTimeUiState) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors   = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+        ),
+        shape = MaterialTheme.shapes.medium
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 14.dp, vertical = 12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(
+                    Icons.Default.DirectionsBus,
+                    contentDescription = null,
+                    tint     = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(22.dp)
+                )
+                Spacer(Modifier.width(10.dp))
+                Column {
+                    Text(
+                        "Duración del trayecto",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Text(
+                        "Recorrido completo de la ruta",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+                    )
+                }
+            }
+            when (state) {
+                is RouteTimeUiState.Idle -> {
+                    CircularProgressIndicator(
+                        modifier    = Modifier.size(20.dp),
+                        strokeWidth = 2.dp,
+                        color       = MaterialTheme.colorScheme.primary
+                    )
+                }
+                is RouteTimeUiState.Result -> {
+                    Column(horizontalAlignment = Alignment.End) {
+                        Text(
+                            "~${state.formattedTime}",
+                            style      = MaterialTheme.typography.titleLarge,
+                            fontWeight = FontWeight.Bold,
+                            color      = MaterialTheme.colorScheme.primary
+                        )
+                        Text(
+                            "${state.distanceKm} km · 32 km/h",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+            }
         }
     }
 }
 
-@Composable
-fun DefaultPlaceholder() {
-    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-        Icon(Icons.Default.DirectionsBus, null, Modifier.size(48.dp), tint = MaterialTheme.colorScheme.outline)
-        Text("Foto no disponible", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-    }
-}
-
-@Composable
-fun InfoItem(icon: androidx.compose.ui.graphics.vector.ImageVector, label: String, value: String) {
-    Row(verticalAlignment = Alignment.CenterVertically) {
-        Icon(icon, null, Modifier.size(20.dp), tint = MaterialTheme.colorScheme.primary)
-        Spacer(Modifier.width(8.dp))
-        Column {
-            Text(label, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            Text(value, style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Medium, color = MaterialTheme.colorScheme.onSurface)
-        }
-    }
-}
-
+/** Muestra el precio de una tarifa con etiqueta centrada. */
 @Composable
 fun FarePriceItem(label: String, price: String) {
-    Column {
-        Text(label, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        Text("$$price", style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+        Text(
+            text  = "$$price",
+            style = MaterialTheme.typography.titleMedium,
+            fontWeight = FontWeight.Bold,
+            color = MaterialTheme.colorScheme.primary
+        )
+        Text(
+            text  = label,
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+    }
+}
+
+/** Fila de información con icono, etiqueta y valor. */
+@Composable
+fun InfoItem(icon: ImageVector, label: String, value: String) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 4.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Icon(
+            imageVector        = icon,
+            contentDescription = null,
+            tint               = MaterialTheme.colorScheme.primary,
+            modifier           = Modifier.size(18.dp)
+        )
+        Spacer(Modifier.width(8.dp))
+        Text(
+            text  = label,
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.weight(1f)
+        )
+        Text(
+            text  = value,
+            style = MaterialTheme.typography.bodySmall,
+            fontWeight = FontWeight.Medium,
+            color = MaterialTheme.colorScheme.onSurface
+        )
     }
 }
