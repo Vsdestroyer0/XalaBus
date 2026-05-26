@@ -22,6 +22,12 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.xalabus.ui.viewmodel.RouteViewModel
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.foundation.interaction.MutableInteractionSource
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -33,6 +39,10 @@ fun HomeScreen(
     val routes by viewModel.filteredRoutes.collectAsState()
     val searchText by viewModel.searchQuery.collectAsState()
     var showFaq by remember { mutableStateOf(false) }
+
+    var isSearchFocused by remember { mutableStateOf(false) }
+    val searchHistory by viewModel.searchHistory.collectAsState()
+    val focusManager = LocalFocusManager.current
 
     Scaffold(
         topBar = {
@@ -68,76 +78,201 @@ fun HomeScreen(
             }
         }
     ) { padding ->
-        Column(
+        Box(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding)
-        ) { val isSorted by viewModel.isSortedAlphabetically.collectAsState()
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 8.dp),
-                verticalAlignment = Alignment.CenterVertically
+        ) {
+            Column(
+                modifier = Modifier.fillMaxSize()
             ) {
-            OutlinedTextField(
-                value = searchText,
-                onValueChange = { viewModel.onSearchQueryChanged(it) },
-                modifier = Modifier.weight(1f),
-                textStyle = MaterialTheme.typography.bodyMedium.copy(fontSize = 14.sp),
-                placeholder = { Text("Buscar ruta...", style = MaterialTheme.typography.bodyMedium.copy(fontSize = 14.sp)) },
-                leadingIcon = { Icon(Icons.Default.Search, null, Modifier.size(20.dp)) },
-                trailingIcon = {
-                    if (searchText.isNotEmpty()) {
-                        IconButton(onClick = { viewModel.onSearchQueryChanged("") }) {
-                            Icon(Icons.Default.Clear, "Limpiar", Modifier.size(20.dp))
-                        }
-                    }
-                },
-
-                shape = RoundedCornerShape(16.dp),
-                singleLine = true,
-                colors = OutlinedTextFieldDefaults.colors(
-                    focusedContainerColor = MaterialTheme.colorScheme.surface,
-                    unfocusedContainerColor = MaterialTheme.colorScheme.surface,
-                )
-            )
-                Spacer(modifier = Modifier.width(8.dp))
-
-                FilledIconToggleButton(
-                    checked = isSorted,
-                    onCheckedChange = { viewModel.toggleSortAlphabetically() },
-                    colors = IconButtonDefaults.filledIconToggleButtonColors(
-                        containerColor = Color.Transparent,
-                        checkedContainerColor = MaterialTheme.colorScheme.primaryContainer,
-                        checkedContentColor = MaterialTheme.colorScheme.onPrimaryContainer
-                    )
+                val isSorted by viewModel.isSortedAlphabetically.collectAsState()
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Icon(
-                        imageVector = Icons.Default.SortByAlpha,
-                        contentDescription = "Ordenar A-Z"
+                    OutlinedTextField(
+                        value = searchText,
+                        onValueChange = { viewModel.onSearchQueryChanged(it) },
+                        modifier = Modifier
+                            .weight(1f)
+                            .onFocusChanged { isSearchFocused = it.isFocused },
+                        textStyle = MaterialTheme.typography.bodyMedium.copy(fontSize = 14.sp),
+                        placeholder = { Text("Buscar ruta...", style = MaterialTheme.typography.bodyMedium.copy(fontSize = 14.sp)) },
+                        leadingIcon = { Icon(Icons.Default.Search, null, Modifier.size(20.dp)) },
+                        trailingIcon = {
+                            if (searchText.isNotEmpty()) {
+                                IconButton(onClick = { viewModel.onSearchQueryChanged("") }) {
+                                    Icon(Icons.Default.Clear, "Limpiar", Modifier.size(20.dp))
+                                }
+                            }
+                        },
+                        keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
+                        keyboardActions = KeyboardActions(
+                            onSearch = {
+                                if (searchText.isNotBlank()) {
+                                    viewModel.saveSearchQuery(searchText)
+                                }
+                                focusManager.clearFocus()
+                            }
+                        ),
+                        shape = RoundedCornerShape(16.dp),
+                        singleLine = true,
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedContainerColor = MaterialTheme.colorScheme.surface,
+                            unfocusedContainerColor = MaterialTheme.colorScheme.surface,
+                        )
                     )
+                    Spacer(modifier = Modifier.width(8.dp))
+
+                    FilledIconToggleButton(
+                        checked = isSorted,
+                        onCheckedChange = { viewModel.toggleSortAlphabetically() },
+                        colors = IconButtonDefaults.filledIconToggleButtonColors(
+                            containerColor = Color.Transparent,
+                            checkedContainerColor = MaterialTheme.colorScheme.primaryContainer,
+                            checkedContentColor = MaterialTheme.colorScheme.onPrimaryContainer
+                        )
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.SortByAlpha,
+                            contentDescription = "Ordenar A-Z"
+                        )
+                    }
+                }
+
+                Text(
+                    text = if (routes.isEmpty() && searchText.isNotEmpty())
+                        "No se encontraron rutas para '$searchText'"
+                    else "Rutas disponibles en Xalapa",
+                    style = MaterialTheme.typography.labelMedium,
+                    modifier = Modifier.padding(horizontal = 20.dp, vertical = 4.dp),
+                    color = MaterialTheme.colorScheme.primary
+                )
+
+                LazyColumn(
+                    modifier = Modifier.fillMaxSize(),
+                    contentPadding = PaddingValues(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    items(routes) { route ->
+                        RouteCard(
+                            name = route.name,
+                            onClick = {
+                                if (searchText.isNotBlank()) {
+                                    viewModel.saveSearchQuery(searchText)
+                                }
+                                onRouteClick(route.id)
+                            }
+                        )
+                    }
                 }
             }
 
-            Text(
-                text = if (routes.isEmpty() && searchText.isNotEmpty())
-                    "No se encontraron rutas para '$searchText'"
-                else "Rutas disponibles en Xalapa",
-                style = MaterialTheme.typography.labelMedium,
-                modifier = Modifier.padding(horizontal = 20.dp, vertical = 4.dp),
-                color = MaterialTheme.colorScheme.primary
-            )
+            if (isSearchFocused) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(top = 72.dp)
+                        .clickable(
+                            interactionSource = remember { MutableInteractionSource() },
+                            indication = null
+                        ) {
+                            focusManager.clearFocus()
+                        }
+                )
+            }
 
-            LazyColumn(
-                modifier = Modifier.fillMaxSize(),
-                contentPadding = PaddingValues(16.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
-                items(routes) { route ->
-                    RouteCard(
-                        name = route.name,
-                        onClick = { onRouteClick(route.id) }
-                    )
+            if (isSearchFocused && searchHistory.isNotEmpty()) {
+                Card(
+                    modifier = Modifier
+                        .padding(top = 64.dp, start = 16.dp, end = 72.dp)
+                        .fillMaxWidth()
+                        .wrapContentHeight(),
+                    shape = RoundedCornerShape(12.dp),
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.surface
+                    ),
+                    elevation = CardDefaults.cardElevation(defaultElevation = 8.dp)
+                ) {
+                    Column(
+                        modifier = Modifier.padding(vertical = 8.dp)
+                    ) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 16.dp, vertical = 4.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = "Búsquedas recientes",
+                                style = MaterialTheme.typography.labelMedium,
+                                color = MaterialTheme.colorScheme.secondary
+                            )
+                            TextButton(
+                                onClick = {
+                                    viewModel.clearSearchHistory()
+                                },
+                                contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp),
+                                modifier = Modifier.height(32.dp)
+                            ) {
+                                Text(
+                                    text = "Borrar todo",
+                                    style = MaterialTheme.typography.labelMedium,
+                                    color = MaterialTheme.colorScheme.primary
+                                )
+                            }
+                        }
+
+                        HorizontalDivider(
+                            color = MaterialTheme.colorScheme.outlineVariant,
+                            modifier = Modifier.padding(vertical = 4.dp)
+                        )
+
+                        searchHistory.take(5).forEach { query ->
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clickable {
+                                        viewModel.onSearchQueryChanged(query)
+                                        viewModel.saveSearchQuery(query)
+                                        focusManager.clearFocus()
+                                    }
+                                    .padding(horizontal = 16.dp, vertical = 8.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Search,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    modifier = Modifier.size(20.dp)
+                                )
+                                Spacer(modifier = Modifier.width(12.dp))
+                                Text(
+                                    text = query,
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = MaterialTheme.colorScheme.onSurface,
+                                    modifier = Modifier.weight(1f)
+                                )
+                                IconButton(
+                                    onClick = {
+                                        viewModel.deleteSearchQuery(query)
+                                    },
+                                    modifier = Modifier.size(24.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.Delete,
+                                        contentDescription = "Eliminar",
+                                        tint = MaterialTheme.colorScheme.error.copy(alpha = 0.8f),
+                                        modifier = Modifier.size(18.dp)
+                                    )
+                                }
+                            }
+                        }
+                    }
                 }
             }
         }
@@ -147,6 +282,7 @@ fun HomeScreen(
         }
     }
 }
+
 
 @Composable
 fun RouteCard(

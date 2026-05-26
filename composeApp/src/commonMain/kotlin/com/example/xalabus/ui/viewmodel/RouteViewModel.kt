@@ -41,6 +41,28 @@ class RouteViewModel(
     private val _searchQuery = MutableStateFlow("")
     val searchQuery: StateFlow<String> = _searchQuery
 
+    // Historial de búsqueda persistente
+    private val _searchHistory = MutableStateFlow(com.example.xalabus.core.prefs.SearchHistoryPreferences.getSearchHistory())
+    val searchHistory: StateFlow<List<String>> = _searchHistory
+
+    fun saveSearchQuery(query: String) {
+        val trimmed = query.trim()
+        if (trimmed.isNotEmpty()) {
+            com.example.xalabus.core.prefs.SearchHistoryPreferences.saveSearchQuery(trimmed)
+            _searchHistory.value = com.example.xalabus.core.prefs.SearchHistoryPreferences.getSearchHistory()
+        }
+    }
+
+    fun deleteSearchQuery(query: String) {
+        com.example.xalabus.core.prefs.SearchHistoryPreferences.deleteSearchQuery(query)
+        _searchHistory.value = com.example.xalabus.core.prefs.SearchHistoryPreferences.getSearchHistory()
+    }
+
+    fun clearSearchHistory() {
+        com.example.xalabus.core.prefs.SearchHistoryPreferences.clearSearchHistory()
+        _searchHistory.value = emptyList()
+    }
+
     // NUEVO: 2. Estado para saber si el orden alfabético está activo
     private val _isSortedAlphabetically = MutableStateFlow(false)
     val isSortedAlphabetically: StateFlow<Boolean> = _isSortedAlphabetically
