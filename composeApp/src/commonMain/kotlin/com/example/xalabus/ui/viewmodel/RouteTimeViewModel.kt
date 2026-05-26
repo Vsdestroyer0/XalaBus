@@ -1,205 +1,86 @@
 package com.example.xalabus.ui.viewmodel
 
 import androidx.lifecycle.ViewModel
-import androidx.lifecycle.viewModelScope
-import com.example.xalabus.core.util.ErrorMapper
 import com.example.xalabus.core.util.TravelTimeEstimator
-import com.example.xalabus.data.SupabaseClientProvider
-import io.github.jan.supabase.postgrest.postgrest
-import io.github.jan.supabase.postgrest.query.Order
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.launch
-import kotlinx.serialization.SerialName
-import kotlinx.serialization.Serializable
+import kotlin.math.*
 
 /**
- * Modelo de parada que llega desde la tabla `paradas` de Supabase.
- * Sólo se mapean los campos necesarios para el cálculo de CU-11.
+ * CU-11: Estado de UI para el componente de duración total del trayecto.
  *
- * El campo [orden] permite ordenar las paradas en la secuencia correcta
- * para que el cálculo Haversine sea acumulado en orden real del recorrido.
- */
-@Serializable
-data class ParadaItem(
-    val id: String = "",
-    val nombre: String = "",
-    val latitud: Double = 0.0,
-    val longitud: Double = 0.0,
-    @SerialName("ruta_id") val rutaId: String = "",
-    val orden: Int = 0
-)
-
-/**
- * Estados de UI para CU-11 (selector de tramo).
- *
- * - Idle:    Estado inicial / reiniciado.
- * - Loading: Cargando paradas desde Supabase.
- * - Ready:   Paradas cargadas; usuario puede seleccionar origen y destino.
- * - Result:  Cálculo completado; muestra tiempo estimado.
- * - Error:   Ex-01, datos no disponibles.
+ * - Idle:   Sin ruta seleccionada.
+ * - Result: Cálculo listo con distancia total y tiempo estimado.
  */
 sealed class RouteTimeUiState {
-    object Idle    : RouteTimeUiState()
-    object Loading : RouteTimeUiState()
+    object Idle : RouteTimeUiState()
 
-    /** Paradas listas para seleccionar tramo */
-    data class Ready(
-        val paradas: List<ParadaItem>,
-        val fromIndex: Int = 0,
-        val toIndex: Int = if (paradas.size > 1) paradas.size - 1 else 0
-    ) : RouteTimeUiState()
-
-    /** Resultado del cálculo de tiempo */
     data class Result(
-        val paradas: List<ParadaItem>,
-        val fromIndex: Int,
-        val toIndex: Int,
+        val distanceKm: Double,
         val totalMinutes: Int,
-        val formattedTime: String,
-        /** Detalle legible: paradas intermedias y km del tramo */
-        val stopCount: Int,
-        val distanceKm: Double
+        val formattedTime: String
     ) : RouteTimeUiState()
-
-    /** Ex-01: datos no disponibles */
-    data class Error(val message: String) : RouteTimeUiState()
 }
 
 /**
- * CU-11: ViewModel que:
- *  1. Carga todas las paradas de una ruta desde la tabla `paradas` de Supabase,
- *     ordenadas por el campo `orden` para respetar la secuencia real del recorrido.
- *  2. Permite al usuario seleccionar parada origen y parada destino.
- *  3. Calcula el tiempo estimado usando [TravelTimeEstimator.estimateMinutesForSegment]:
- *       tiempo = (distancia Haversine km / 30 km/h * 60) + (paradas intermedias * 1 min)
+ * CU-11: ViewModel que calcula el tiempo total del trayecto de una ruta
+ * a partir de su geometría (lista de coordenadas ya cargadas en memoria).
  *
- * Fórmula de paradas intermedias:
- *   intermedias = toIndex - fromIndex  (ej. A→D tiene 3 paradas: B, C, D)
- *   (la parada de origen NO se cuenta porque el usuario ya está ahí)
+ * No hace llamadas a Supabase ni depende de paradas.
+ * El cálculo es: distancia Haversine acumulada / 32 km/h → minutos totales.
+ *
+ * @param SPEED_KMH  Velocidad promedio del camión: 32 km/h (fija por requerimiento CU-11).
  */
 class RouteTimeViewModel : ViewModel() {
 
-    private val supabase = SupabaseClientProvider.client
+    companion object {
+        private const val SPEED_KMH = 32.0
+    }
 
     private val _uiState = MutableStateFlow<RouteTimeUiState>(RouteTimeUiState.Idle)
     val uiState: StateFlow<RouteTimeUiState> = _uiState.asStateFlow()
 
-    // -----------------------------------------------------------------------
-    // Carga de paradas
-    // -----------------------------------------------------------------------
-
     /**
-     * Carga las paradas de [routeId] desde Supabase ordenadas por `orden` ASC.
-     * El orden correcto es esencial para que el cálculo Haversine acumule
-     * distancias en la secuencia real del recorrido de la ruta.
+     * Calcula el tiempo total del trayecto desde la geometría de la ruta.
      *
-     * Al terminar emite [RouteTimeUiState.Ready] con la lista lista para seleccionar
-     * y calcula automáticamente el tiempo del tramo completo (primera → última parada).
-     */
-    fun loadStops(routeId: String) {
-        _uiState.value = RouteTimeUiState.Loading
-        viewModelScope.launch {
-            try {
-                val paradas = supabase.postgrest["paradas"]
-                    .select {
-                        filter { eq("ruta_id", routeId) }
-                        order("orden", Order.ASCENDING)
-                    }
-                    .decodeList<ParadaItem>()
-
-                if (paradas.size < 2) {
-                    _uiState.value = RouteTimeUiState.Error(
-                        "Esta ruta no tiene suficientes paradas registradas para calcular el tiempo."
-                    )
-                    return@launch
-                }
-
-                _uiState.value = RouteTimeUiState.Ready(
-                    paradas   = paradas,
-                    fromIndex = 0,
-                    toIndex   = paradas.size - 1
-                )
-
-                // Calcular automáticamente el tramo completo al cargar
-                calculateSegment(paradas, fromIndex = 0, toIndex = paradas.size - 1)
-
-            } catch (e: Exception) {
-                _uiState.value = RouteTimeUiState.Error(
-                    ErrorMapper.toUserMessage(e, "al cargar las paradas de la ruta")
-                )
-            }
-        }
-    }
-
-    // -----------------------------------------------------------------------
-    // Cálculo de tramo seleccionado
-    // -----------------------------------------------------------------------
-
-    /**
-     * Recalcula el tiempo cuando el usuario cambia la parada de origen o destino.
+     * [routePoints] es la lista de polylines tal como la expone
+     * [RouteViewModel.selectedRoutePoints]: List<List<List<Double>>>
+     * donde cada punto es [longitud, latitud] (formato GeoJSON).
      *
-     * @param fromIndex  Índice de la parada de origen en la lista actual.
-     * @param toIndex    Índice de la parada de destino en la lista actual.
+     * Si la geometría está vacía o tiene menos de 2 puntos no hace nada.
      */
-    fun onSegmentSelected(fromIndex: Int, toIndex: Int) {
-        val current = _uiState.value
-        val paradas: List<ParadaItem> = when (current) {
-            is RouteTimeUiState.Ready  -> current.paradas
-            is RouteTimeUiState.Result -> current.paradas
-            else -> return  // no hay datos cargados aún
-        }
-
-        // FA-01: origen y destino iguales o inválidos — no calcular
-        if (fromIndex >= toIndex || fromIndex < 0 || toIndex >= paradas.size) {
-            _uiState.value = RouteTimeUiState.Error(
-                "Selecciona una parada de origen anterior a la de destino."
-            )
+    fun calculateFromGeometry(routePoints: List<List<List<Double>>>) {
+        // Aplanar todas las polylines en una sola secuencia de puntos
+        val points = routePoints.flatten()
+        if (points.size < 2) {
+            _uiState.value = RouteTimeUiState.Idle
             return
         }
 
-        calculateSegment(paradas, fromIndex, toIndex)
-    }
-
-    // -----------------------------------------------------------------------
-    // Lógica interna
-    // -----------------------------------------------------------------------
-
-    private fun calculateSegment(
-        paradas: List<ParadaItem>,
-        fromIndex: Int,
-        toIndex: Int
-    ) {
-        val stops = paradas.map { Pair(it.latitud, it.longitud) }
-        val minutes = TravelTimeEstimator.estimateMinutesForSegment(stops, fromIndex, toIndex)
-
-        if (minutes == null) {
-            _uiState.value = RouteTimeUiState.Error(
-                "No se pudo calcular el tiempo. Verifica los datos de las paradas."
-            )
-            return
-        }
-
-        // Distancia acumulada del tramo (para el detalle)
+        // Acumular distancia Haversine entre puntos consecutivos
+        // Formato GeoJSON: cada punto = [lon, lat]
         var totalKm = 0.0
-        for (i in fromIndex until toIndex) {
-            totalKm += TravelTimeEstimator.haversineDistanceKm(
-                paradas[i].latitud,     paradas[i].longitud,
-                paradas[i + 1].latitud, paradas[i + 1].longitud
-            )
+        for (i in 0 until points.size - 1) {
+            val (lon1, lat1) = points[i]
+            val (lon2, lat2) = points[i + 1]
+            totalKm += TravelTimeEstimator.haversineDistanceKm(lat1, lon1, lat2, lon2)
         }
+
+        // tiempo (min) = (km / km/h) * 60
+        val totalMinutes = ((totalKm / SPEED_KMH) * 60).roundToInt()
 
         _uiState.value = RouteTimeUiState.Result(
-            paradas       = paradas,
-            fromIndex     = fromIndex,
-            toIndex       = toIndex,
-            totalMinutes  = minutes,
-            formattedTime = TravelTimeEstimator.formatMinutes(minutes),
-            stopCount     = toIndex - fromIndex,  // paradas intermedias + destino
-            distanceKm    = (totalKm * 10).toLong() / 10.0  // redondear a 1 decimal
+            distanceKm    = (totalKm * 10).toLong() / 10.0,   // 1 decimal
+            totalMinutes  = totalMinutes,
+            formattedTime = TravelTimeEstimator.formatMinutes(totalMinutes)
         )
     }
 
-    fun resetState() { _uiState.value = RouteTimeUiState.Idle }
+    fun resetState() {
+        _uiState.value = RouteTimeUiState.Idle
+    }
 }
+
+// Extensión para redondear Double a Int (evita importar kotlin.math en el archivo)
+private fun Double.roundToInt(): Int = kotlin.math.roundToInt(this)
