@@ -2,11 +2,12 @@ package com.example.xalabus.data.paradas
 
 import com.example.xalabus.data.SupabaseClientProvider
 import io.github.jan.supabase.postgrest.postgrest
+import io.github.jan.supabase.postgrest.query.filter.FilterOperator
 
 /**
- * Repositorio de paradas — CU-12.
+ * Repositorio de paradas — CU-12 y gestión admin.
  * Opera sobre la tabla `paradas` en Supabase.
- * Solo el admin puede insertar; todos pueden leer.
+ * Solo el admin puede insertar/modificar; todos pueden leer.
  */
 class ParadasRepository {
     private val client = SupabaseClientProvider.client
@@ -42,5 +43,41 @@ class ParadasRepository {
                 }
             }
             .decodeList<Parada>()
+    }
+
+    // ───────────────────────────────────────────────────────────────────────────
+    // Métodos de gestión admin (requieren campo `estado` en la tabla)
+    // ───────────────────────────────────────────────────────────────────────────
+
+    /**
+     * Retorna paradas con estado = 'pendiente' para revisión del admin.
+     * Requiere que la columna `estado` exista en la tabla `paradas` de Supabase.
+     */
+    suspend fun getPendingParadas(): List<Parada> {
+        return client.postgrest["paradas"]
+            .select { filter { eq("estado", "pendiente") } }
+            .decodeList<Parada>()
+    }
+
+    /**
+     * Aprueba una parada sugerida cambiando su estado a 'aprobada'.
+     * Postcondición: la parada queda visible para todos los usuarios.
+     */
+    suspend fun approveParada(parada: Parada) {
+        val id = parada.id ?: return
+        client.postgrest["paradas"]
+            .update({ set("estado", "aprobada") }) {
+                filter { eq("id", id) }
+            }
+    }
+
+    /**
+     * Rechaza y elimina una parada sugerida.
+     * Postcondición: la parada deja de aparecer en la app.
+     */
+    suspend fun rejectParada(parada: Parada) {
+        val id = parada.id ?: return
+        client.postgrest["paradas"]
+            .delete { filter { eq("id", id) } }
     }
 }

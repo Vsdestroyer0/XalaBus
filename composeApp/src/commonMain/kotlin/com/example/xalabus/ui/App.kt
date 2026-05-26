@@ -1,6 +1,7 @@
 package com.example.xalabus.ui
 
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
@@ -520,7 +521,7 @@ fun MapDetailView(
 
                 Spacer(Modifier.height(20.dp))
 
-                // ── Sección de Tarifas ──────────────────────────────────────
+                // ── Sección de Tarifas ────────────────────────────────────────────
                 Card(
                     modifier = Modifier.fillMaxWidth(),
                     colors = CardDefaults.cardColors(
@@ -557,7 +558,7 @@ fun MapDetailView(
 
                 Spacer(Modifier.height(16.dp))
 
-                // ── CU-11: Card de duración total del trayecto ─────────────
+                // ── CU-11: Card de duración total del trayecto ─────────────────
                 RouteTravelTimeCard(state = routeTimeState)
 
                 Spacer(Modifier.height(8.dp))

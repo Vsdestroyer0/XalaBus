@@ -6,6 +6,9 @@ import kotlinx.serialization.Serializable
 /**
  * Modelo de la tabla `paradas` en Supabase (CU-12).
  * Solo accesible para agregar por rol admin/developer.
+ *
+ * El campo [estado] es opcional: null significa parada activa/aprobada;
+ * "pendiente" indica sugerencia de usuario aun no revisada (CU-admin).
  */
 @Serializable
 data class Parada(
@@ -15,6 +18,7 @@ data class Parada(
     val longitud: Double,
     @SerialName("ruta_id")
     val rutaId: String,
+    val estado: String? = null,
     @SerialName("created_at")
     val createdAt: String? = null
 )
