@@ -74,7 +74,7 @@ fun App(
     val forgotPasswordViewModel = remember { ForgotPasswordViewModel() }
     // CU-10: ViewModel de favoritos
     val favoritosViewModel = remember { FavoritosViewModel() }
-    // CU-11: ViewModel de tiempo estimado de traslado (selector de tramo)
+    // CU-11: ViewModel de tiempo estimado de traslado (cálculo fijo desde geometría)
     val routeTimeViewModel = remember { RouteTimeViewModel() }
     // CU-13: ViewModel de incidentes GPS
     val incidentViewModel = remember { IncidentViewModel() }
@@ -85,7 +85,7 @@ fun App(
 
     var isAuthenticated by remember { mutableStateOf(authViewModel.isSessionActive()) }
     var destination by remember {
-        mutableStateOf(AppDestination.MAIN) // Iniciamos en MAIN para que sea offline-first
+        mutableStateOf(AppDestination.MAIN)
     }
     var currentAuthScreen by remember { mutableStateOf(AuthScreen.LOGIN) }
 
@@ -101,7 +101,6 @@ fun App(
                         },
                         onNavigateToRegister = { currentAuthScreen = AuthScreen.REGISTER },
                         onBack               = { destination = AppDestination.MAIN },
-                        // CU-03: navegar a la pantalla de recuperación
                         onForgotPassword     = { currentAuthScreen = AuthScreen.FORGOT_PASSWORD }
                     )
                     AuthScreen.REGISTER -> RegisterScreen(
@@ -109,7 +108,7 @@ fun App(
                         onRegisterSuccess = { currentAuthScreen = AuthScreen.LOGIN },
                         onNavigateToLogin = { currentAuthScreen = AuthScreen.LOGIN }
                     )
-                    // CU-03: pantalla de recuperación de contraseña
+                    // CU-03
                     AuthScreen.FORGOT_PASSWORD -> ForgotPasswordScreen(
                         viewModel = forgotPasswordViewModel,
                         onSuccess = { currentAuthScreen = AuthScreen.LOGIN },
@@ -338,8 +337,6 @@ private fun MainAppContent(
                     onOpenDrawer = { scope.launch { drawerState.open() } },
                     onRouteClick = { routeId ->
                         viewModel.selectRoute(routeId)
-                        // CU-11: cargar paradas de la ruta seleccionada para el estimador
-                        routeTimeViewModel.loadStops(routeId)
                         showMap = true
                     }
                 )
@@ -382,6 +379,7 @@ fun MapDetailView(
     onBack: () -> Unit
 ) {
     val selectedRoute  by viewModel.selectedRoute.collectAsState()
+    val routePoints    by viewModel.selectedRoutePoints.collectAsState()
     val scaffoldState = rememberBottomSheetScaffoldState()
     val routeId       = selectedRoute?.id ?: ""
     val parsedRouteId = routeId.toIntOrNull() ?: 0
@@ -401,6 +399,13 @@ fun MapDetailView(
     LaunchedEffect(routeId) {
         if (routeId.isNotEmpty()) {
             favoritosViewModel.checkIfFavorite(routeId)
+        }
+    }
+
+    // CU-11: calcular duración en cuanto llegan los puntos de la ruta
+    LaunchedEffect(routePoints) {
+        if (routePoints.isNotEmpty()) {
+            routeTimeViewModel.calculateFromGeometry(routePoints)
         }
     }
 
@@ -487,7 +492,7 @@ fun MapDetailView(
 
                 Spacer(Modifier.height(20.dp))
 
-                // ── Sección de Tarifas ──────────────────────────────────────────
+                // ── Sección de Tarifas ──────────────────────────────────────────────
                 Card(
                     modifier = Modifier.fillMaxWidth(),
                     colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)),
@@ -513,13 +518,8 @@ fun MapDetailView(
 
                 Spacer(Modifier.height(16.dp))
 
-                // ── CU-11: Selector de tramo y tiempo estimado ─────────────────
-                RouteTimeSelectorCard(
-                    state     = routeTimeState,
-                    onSegmentSelected = { from, to ->
-                        routeTimeViewModel.onSegmentSelected(from, to)
-                    }
-                )
+                // ── CU-11: Card de duración total del trayecto ─────────────────────────
+                RouteTravelTimeCard(state = routeTimeState)
 
                 Spacer(Modifier.height(8.dp))
 
@@ -619,7 +619,7 @@ fun MapDetailView(
             com.example.xalabus.ui.reports.RouteStopDialog(
                 viewModel = reportsViewModel,
                 routeId = parsedRouteId,
-                latitude = 19.543, // Coord. default Xalapa
+                latitude = 19.543,
                 longitude = -96.927,
                 onDismiss = { showStopDialog = false }
             )
@@ -628,21 +628,12 @@ fun MapDetailView(
 }
 
 /**
- * CU-11: Card con el selector de tramo (parada origen → parada destino)
- * y el tiempo estimado resultante.
- *
- * Estados posibles:
- *  - Idle/Loading → muestra indicador de carga
- *  - Ready        → muestra dropdowns para seleccionar tramo
- *  - Result       → muestra el tiempo calculado y detalle del tramo
- *  - Error        → muestra mensaje de error (Ex-01)
+ * CU-11: Card compacto que muestra la duración total estimada del trayecto completo.
+ * Se calcula automáticamente al entrar a la ruta desde su geometría GeoJSON.
+ * Velocidad promedio fija: 32 km/h.
  */
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun RouteTimeSelectorCard(
-    state: RouteTimeUiState,
-    onSegmentSelected: (fromIndex: Int, toIndex: Int) -> Unit
-) {
+fun RouteTravelTimeCard(state: RouteTimeUiState) {
     Card(
         modifier = Modifier.fillMaxWidth(),
         colors   = CardDefaults.cardColors(
@@ -650,273 +641,61 @@ fun RouteTimeSelectorCard(
         ),
         shape = MaterialTheme.shapes.medium
     ) {
-        Column(modifier = Modifier.padding(12.dp)) {
-
-            // Encabezado de la sección
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 14.dp, vertical = 12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            // Icono + etiqueta
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Icon(
-                    Icons.Default.AccessTime,
+                    Icons.Default.DirectionsBus,
                     contentDescription = null,
                     tint     = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.size(20.dp)
+                    modifier = Modifier.size(22.dp)
                 )
-                Spacer(Modifier.width(8.dp))
-                Text(
-                    "Tiempo Estimado de Traslado",
-                    style      = MaterialTheme.typography.titleSmall,
-                    fontWeight = FontWeight.Bold
-                )
+                Spacer(Modifier.width(10.dp))
+                Column {
+                    Text(
+                        "Duración del trayecto",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Text(
+                        "Recorrido completo de la ruta",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+                    )
+                }
             }
 
-            Spacer(Modifier.height(10.dp))
-
+            // Valor calculado
             when (state) {
-                // ── Cargando paradas ────────────────────────────────────────
-                is RouteTimeUiState.Idle,
-                is RouteTimeUiState.Loading -> {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        CircularProgressIndicator(
-                            modifier   = Modifier.size(16.dp),
-                            strokeWidth = 2.dp,
+                is RouteTimeUiState.Idle -> {
+                    CircularProgressIndicator(
+                        modifier    = Modifier.size(20.dp),
+                        strokeWidth = 2.dp,
+                        color       = MaterialTheme.colorScheme.primary
+                    )
+                }
+                is RouteTimeUiState.Result -> {
+                    Column(horizontalAlignment = Alignment.End) {
+                        Text(
+                            "~${state.formattedTime}",
+                            style      = MaterialTheme.typography.titleLarge,
+                            fontWeight = FontWeight.Bold,
                             color      = MaterialTheme.colorScheme.primary
                         )
                         Text(
-                            "Cargando paradas de la ruta...",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-                }
-
-                // ── Paradas listas, seleccionar tramo ───────────────────────
-                is RouteTimeUiState.Ready -> {
-                    StopSegmentSelector(
-                        paradas       = state.paradas,
-                        fromIndex     = state.fromIndex,
-                        toIndex       = state.toIndex,
-                        onSegmentSelected = onSegmentSelected
-                    )
-                }
-
-                // ── Resultado del cálculo ───────────────────────────────────
-                is RouteTimeUiState.Result -> {
-                    // Selector para cambiar el tramo
-                    StopSegmentSelector(
-                        paradas       = state.paradas,
-                        fromIndex     = state.fromIndex,
-                        toIndex       = state.toIndex,
-                        onSegmentSelected = onSegmentSelected
-                    )
-
-                    Spacer(Modifier.height(12.dp))
-                    HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.3f))
-                    Spacer(Modifier.height(10.dp))
-
-                    // Tiempo estimado grande
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Column {
-                            Text(
-                                "Tiempo estimado",
-                                style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                            Text(
-                                "~${state.formattedTime}",
-                                style      = MaterialTheme.typography.headlineMedium,
-                                fontWeight = FontWeight.Bold,
-                                color      = MaterialTheme.colorScheme.primary
-                            )
-                        }
-                        Column(horizontalAlignment = Alignment.End) {
-                            // Detalle: paradas y distancia
-                            Text(
-                                "${state.stopCount} paradas intermedias",
-                                style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                            Text(
-                                "${state.distanceKm} km · 30 km/h",
-                                style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                            Text(
-                                "+${state.stopCount} min por paradas",
-                                style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.secondary
-                            )
-                        }
-                    }
-                }
-
-                // ── Ex-01: datos no disponibles ─────────────────────────────
-                is RouteTimeUiState.Error -> {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        Icon(
-                            Icons.Default.Info,
-                            contentDescription = null,
-                            tint     = MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.size(16.dp)
-                        )
-                        Text(
-                            state.message,
-                            style = MaterialTheme.typography.bodySmall,
+                            "${state.distanceKm} km · 32 km/h",
+                            style = MaterialTheme.typography.labelSmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
                 }
             }
         }
-    }
-}
-
-/**
- * CU-11: Selector de parada origen y parada destino con dos ExposedDropdownMenuBox.
- * Al cambiar cualquiera de los dos, notifica inmediatamente con [onSegmentSelected].
- */
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-private fun StopSegmentSelector(
-    paradas: List<com.example.xalabus.ui.viewmodel.ParadaItem>,
-    fromIndex: Int,
-    toIndex: Int,
-    onSegmentSelected: (Int, Int) -> Unit
-) {
-    var selectedFrom by remember(paradas, fromIndex) { mutableStateOf(fromIndex) }
-    var selectedTo   by remember(paradas, toIndex)   { mutableStateOf(toIndex) }
-    var expandFrom   by remember { mutableStateOf(false) }
-    var expandTo     by remember { mutableStateOf(false) }
-
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        // ── Dropdown: Parada ORIGEN ──────────────────────────────────────
-        ExposedDropdownMenuBox(
-            expanded         = expandFrom,
-            onExpandedChange = { expandFrom = it },
-            modifier         = Modifier.weight(1f)
-        ) {
-            OutlinedTextField(
-                value           = paradas.getOrNull(selectedFrom)?.nombre ?: "",
-                onValueChange   = {},
-                readOnly        = true,
-                label           = { Text("Desde", style = MaterialTheme.typography.labelSmall) },
-                trailingIcon    = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expandFrom) },
-                modifier        = Modifier.menuAnchor(),
-                shape           = MaterialTheme.shapes.small,
-                textStyle       = MaterialTheme.typography.bodySmall,
-                singleLine      = true,
-                colors          = OutlinedTextFieldDefaults.colors(
-                    focusedBorderColor   = MaterialTheme.colorScheme.primary,
-                    unfocusedBorderColor = MaterialTheme.colorScheme.outline
-                )
-            )
-            ExposedDropdownMenu(
-                expanded         = expandFrom,
-                onDismissRequest = { expandFrom = false }
-            ) {
-                paradas.forEachIndexed { idx, parada ->
-                    // FA-01: ocultar paradas que no dejan tramo válido (origen >= destino)
-                    if (idx < selectedTo) {
-                        DropdownMenuItem(
-                            text    = { Text(parada.nombre, style = MaterialTheme.typography.bodySmall) },
-                            onClick = {
-                                selectedFrom = idx
-                                expandFrom   = false
-                                onSegmentSelected(idx, selectedTo)
-                            }
-                        )
-                    }
-                }
-            }
-        }
-
-        // Ícono separador
-        Icon(
-            Icons.Default.ArrowForward,
-            contentDescription = null,
-            tint     = MaterialTheme.colorScheme.primary,
-            modifier = Modifier.size(18.dp)
-        )
-
-        // ── Dropdown: Parada DESTINO ─────────────────────────────────────
-        ExposedDropdownMenuBox(
-            expanded         = expandTo,
-            onExpandedChange = { expandTo = it },
-            modifier         = Modifier.weight(1f)
-        ) {
-            OutlinedTextField(
-                value           = paradas.getOrNull(selectedTo)?.nombre ?: "",
-                onValueChange   = {},
-                readOnly        = true,
-                label           = { Text("Hasta", style = MaterialTheme.typography.labelSmall) },
-                trailingIcon    = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expandTo) },
-                modifier        = Modifier.menuAnchor(),
-                shape           = MaterialTheme.shapes.small,
-                textStyle       = MaterialTheme.typography.bodySmall,
-                singleLine      = true,
-                colors          = OutlinedTextFieldDefaults.colors(
-                    focusedBorderColor   = MaterialTheme.colorScheme.primary,
-                    unfocusedBorderColor = MaterialTheme.colorScheme.outline
-                )
-            )
-            ExposedDropdownMenu(
-                expanded         = expandTo,
-                onDismissRequest = { expandTo = false }
-            ) {
-                paradas.forEachIndexed { idx, parada ->
-                    // FA-01: solo mostrar destinos posteriores al origen
-                    if (idx > selectedFrom) {
-                        DropdownMenuItem(
-                            text    = { Text(parada.nombre, style = MaterialTheme.typography.bodySmall) },
-                            onClick = {
-                                selectedTo = idx
-                                expandTo   = false
-                                onSegmentSelected(selectedFrom, idx)
-                            }
-                        )
-                    }
-                }
-            }
-        }
-    }
-}
-
-@Composable
-fun DefaultPlaceholder() {
-    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-        Icon(Icons.Default.DirectionsBus, null, Modifier.size(48.dp), tint = MaterialTheme.colorScheme.outline)
-        Text("Foto no disponible", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-    }
-}
-
-@Composable
-fun InfoItem(icon: androidx.compose.ui.graphics.vector.ImageVector, label: String, value: String) {
-    Row(verticalAlignment = Alignment.CenterVertically) {
-        Icon(icon, null, Modifier.size(20.dp), tint = MaterialTheme.colorScheme.primary)
-        Spacer(Modifier.width(8.dp))
-        Column {
-            Text(label, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            Text(value, style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Medium, color = MaterialTheme.colorScheme.onSurface)
-        }
-    }
-}
-
-@Composable
-fun FarePriceItem(label: String, price: String) {
-    Column {
-        Text(label, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        Text("$$price", style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
     }
 }
