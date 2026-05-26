@@ -2,12 +2,10 @@ package com.example.xalabus.data.paradas
 
 import com.example.xalabus.data.SupabaseClientProvider
 import io.github.jan.supabase.postgrest.postgrest
-import io.github.jan.supabase.postgrest.query.filter.FilterOperator
 
 /**
  * Repositorio de paradas — CU-12 y gestión admin.
  * Opera sobre la tabla `paradas` en Supabase.
- * Solo el admin puede insertar/modificar; todos pueden leer.
  */
 class ParadasRepository {
     private val client = SupabaseClientProvider.client
@@ -45,35 +43,29 @@ class ParadasRepository {
             .decodeList<Parada>()
     }
 
-    // ───────────────────────────────────────────────────────────────────────────
-    // Métodos de gestión admin (requieren campo `estado` en la tabla)
-    // ───────────────────────────────────────────────────────────────────────────
+    // ── Métodos de gestión admin ──────────────────────────────────────────────
 
     /**
-     * Retorna paradas con estado = 'pendiente' para revisión del admin.
-     * Requiere que la columna `estado` exista en la tabla `paradas` de Supabase.
+     * Retorna todas las paradas registradas para que el admin las gestione.
+     * (Sin filtro de estado — la tabla no tiene esa columna.)
      */
     suspend fun getPendingParadas(): List<Parada> {
         return client.postgrest["paradas"]
-            .select { filter { eq("estado", "pendiente") } }
+            .select()
             .decodeList<Parada>()
     }
 
     /**
-     * Aprueba una parada sugerida cambiando su estado a 'aprobada'.
-     * Postcondición: la parada queda visible para todos los usuarios.
+     * "Aprobar" una parada no requiere cambio de estado en este schema.
+     * Solo recarga la lista (no-op en BD, el ViewModel llama fetchPendingStops tras esto).
      */
     suspend fun approveParada(parada: Parada) {
-        val id = parada.id ?: return
-        client.postgrest["paradas"]
-            .update({ set("estado", "aprobada") }) {
-                filter { eq("id", id) }
-            }
+        // No-op: sin columna estado no hay nada que actualizar.
+        // El ViewModel refrescará la lista automáticamente.
     }
 
     /**
-     * Rechaza y elimina una parada sugerida.
-     * Postcondición: la parada deja de aparecer en la app.
+     * Elimina una parada de la BD.
      */
     suspend fun rejectParada(parada: Parada) {
         val id = parada.id ?: return
