@@ -6,6 +6,7 @@ import com.example.xalabus.core.util.ErrorMapper
 import com.example.xalabus.core.util.TravelTimeEstimator
 import com.example.xalabus.data.SupabaseClientProvider
 import io.github.jan.supabase.postgrest.postgrest
+import io.github.jan.supabase.postgrest.query.Order
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -16,6 +17,9 @@ import kotlinx.serialization.Serializable
 /**
  * Modelo de parada que llega desde la tabla `paradas` de Supabase.
  * Sólo se mapean los campos necesarios para el cálculo de CU-11.
+ *
+ * El campo [orden] permite ordenar las paradas en la secuencia correcta
+ * para que el cálculo Haversine sea acumulado en orden real del recorrido.
  */
 @Serializable
 data class ParadaItem(
@@ -23,7 +27,8 @@ data class ParadaItem(
     val nombre: String = "",
     val latitud: Double = 0.0,
     val longitud: Double = 0.0,
-    @SerialName("ruta_id") val rutaId: String = ""
+    @SerialName("ruta_id") val rutaId: String = "",
+    val orden: Int = 0
 )
 
 /**
@@ -64,7 +69,8 @@ sealed class RouteTimeUiState {
 
 /**
  * CU-11: ViewModel que:
- *  1. Carga todas las paradas de una ruta desde la tabla `paradas` de Supabase.
+ *  1. Carga todas las paradas de una ruta desde la tabla `paradas` de Supabase,
+ *     ordenadas por el campo `orden` para respetar la secuencia real del recorrido.
  *  2. Permite al usuario seleccionar parada origen y parada destino.
  *  3. Calcula el tiempo estimado usando [TravelTimeEstimator.estimateMinutesForSegment]:
  *       tiempo = (distancia Haversine km / 30 km/h * 60) + (paradas intermedias * 1 min)
@@ -85,15 +91,22 @@ class RouteTimeViewModel : ViewModel() {
     // -----------------------------------------------------------------------
 
     /**
-     * Carga las paradas de [routeId] desde Supabase en orden.
-     * Al terminar emite [RouteTimeUiState.Ready] con la lista lista para seleccionar.
+     * Carga las paradas de [routeId] desde Supabase ordenadas por `orden` ASC.
+     * El orden correcto es esencial para que el cálculo Haversine acumule
+     * distancias en la secuencia real del recorrido de la ruta.
+     *
+     * Al terminar emite [RouteTimeUiState.Ready] con la lista lista para seleccionar
+     * y calcula automáticamente el tiempo del tramo completo (primera → última parada).
      */
     fun loadStops(routeId: String) {
         _uiState.value = RouteTimeUiState.Loading
         viewModelScope.launch {
             try {
                 val paradas = supabase.postgrest["paradas"]
-                    .select { filter { eq("ruta_id", routeId) } }
+                    .select {
+                        filter { eq("ruta_id", routeId) }
+                        order("orden", Order.ASCENDING)
+                    }
                     .decodeList<ParadaItem>()
 
                 if (paradas.size < 2) {
