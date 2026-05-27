@@ -6,9 +6,11 @@ import com.example.xalabus.data.SupabaseClientProvider
 import com.example.xalabus.data.incidentes.Incidente
 import com.example.xalabus.data.incidentes.IncidentesRepository
 import io.github.jan.supabase.auth.auth
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 
 /** CU-13: Estados de la UI de reporte de incidentes */
@@ -34,7 +36,7 @@ class IncidentViewModel : ViewModel() {
     private val _selectedLng = MutableStateFlow(-96.9269)
     val selectedLng: StateFlow<Double> = _selectedLng.asStateFlow()
 
-    // CU-13 postcondición: lista de incidentes pendientes visibles en el mapa
+    // Lista de incidentes activos (creados en las últimas 4 horas)
     private val _incidentes = MutableStateFlow<List<Incidente>>(emptyList())
     val incidentes: StateFlow<List<Incidente>> = _incidentes.asStateFlow()
 
@@ -46,6 +48,9 @@ class IncidentViewModel : ViewModel() {
         private const val LNG_MIN = -97.00
         private const val LNG_MAX = -96.85
 
+        /** Intervalo de refresco del mapa: cada 5 minutos */
+        private const val REFRESH_INTERVAL_MS = 5 * 60 * 1000L
+
         fun isWithinXalapa(lat: Double, lng: Double): Boolean =
             lat in LAT_MIN..LAT_MAX && lng in LNG_MIN..LNG_MAX
     }
@@ -56,16 +61,21 @@ class IncidentViewModel : ViewModel() {
     }
 
     /**
-     * CU-13 postcondición: carga los incidentes pendientes desde Supabase
-     * para mostrarlos en el mapa principal.
+     * Inicia un loop que refresca los incidentes activos cada 5 minutos.
+     * Llamar una sola vez al abrir el mapa principal (LaunchedEffect(Unit)).
+     * Los incidentes con más de 4h desaparecen automáticamente del mapa
+     * sin necesidad de reiniciar la app.
      */
-    fun cargarIncidentes() {
+    fun iniciarRefrescoIncidentes() {
         viewModelScope.launch {
-            try {
-                _incidentes.value = repository.getIncidentesPendientes()
-            } catch (e: Exception) {
-                // Si falla la carga, simplemente no se muestran — no bloquea el mapa
-                _incidentes.value = emptyList()
+            while (isActive) {
+                try {
+                    _incidentes.value = repository.getIncidentesActivos()
+                } catch (e: Exception) {
+                    // Fallo silencioso: no bloquea el mapa si hay error de red
+                    _incidentes.value = emptyList()
+                }
+                delay(REFRESH_INTERVAL_MS)
             }
         }
     }
@@ -108,8 +118,8 @@ class IncidentViewModel : ViewModel() {
                 )
                 repository.reportarIncidente(incidente)
                 _uiState.value = IncidentUiState.Success
-                // Recargar incidentes para que aparezca el nuevo en el mapa
-                cargarIncidentes()
+                // Refresco inmediato para que el nuevo punto aparezca en el mapa
+                _incidentes.value = repository.getIncidentesActivos()
             } catch (e: Exception) {
                 // Ex-01 (C4)
                 _uiState.value = IncidentUiState.Error("Error al cargar datos. Intenta de nuevo.")
