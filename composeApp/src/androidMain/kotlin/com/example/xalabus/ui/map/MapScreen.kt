@@ -51,7 +51,7 @@ actual fun MapScreen(
     onUserLocationChanged: (lat: Double, lng: Double) -> Unit
 ) {
     val context = LocalContext.current
-    val mapPath    by viewModel.mapFilePath.collectAsState()
+    val mapPath     by viewModel.mapFilePath.collectAsState()
     val routePoints by viewModel.selectedRoutePoints.collectAsState()
     val routeStops  by viewModel.routeStops.collectAsState()
     val incidentes  by incidentViewModel.incidentes.collectAsState()
@@ -62,7 +62,7 @@ actual fun MapScreen(
     var mapLibreMap by remember { mutableStateOf<MapLibreMap?>(null) }
     var loadedStyle  by remember { mutableStateOf<Style?>(null) }
 
-    // ── Permisos de ubicación ────────────────────────────────────────────
+    // ── Permisos + inicio del loop de refresco de incidentes ─────────────
     val permissionLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()
     ) { permissions ->
@@ -75,7 +75,6 @@ actual fun MapScreen(
     }
 
     LaunchedEffect(Unit) {
-        // Solicitar permisos si no están concedidos
         if (ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION)
             != PackageManager.PERMISSION_GRANTED
         ) {
@@ -86,11 +85,12 @@ actual fun MapScreen(
                 )
             )
         }
-        // CU-13 postcondición: cargar incidentes al abrir el mapa
-        incidentViewModel.cargarIncidentes()
+        // CU-13: inicia el loop que refresca incidentes cada 5 min.
+        // Los incidentes con más de 4h desaparecen automáticamente.
+        incidentViewModel.iniciarRefrescoIncidentes()
     }
 
-    // ── Efecto 1: Inicializar mapa ───────────────────────────────────────
+    // ── Efecto 1: Inicializar mapa ────────────────────────────────────────
     LaunchedEffect(Unit) {
         mapView.getMapAsync { map ->
             mapLibreMap = map
@@ -140,7 +140,7 @@ actual fun MapScreen(
         }
     }
 
-    // ── Efecto 2: Re-aplicar estilo si cambia isDarkMode o mapPath ──────────
+    // ── Efecto 2: Re-aplicar estilo si cambia isDarkMode o mapPath ────────
     LaunchedEffect(mapPath, isDarkMode) {
         val map = mapLibreMap ?: return@LaunchedEffect
         val styleFileName = if (isDarkMode) "style_dark.json" else "style.json"
@@ -173,6 +173,7 @@ actual fun MapScreen(
     // ── Efecto 3: Dibujar/actualizar ruta ─────────────────────────────────
     LaunchedEffect(routePoints, loadedStyle) {
         val style = loadedStyle ?: return@LaunchedEffect
+        val map   = mapLibreMap  ?: return@LaunchedEffect
         val routeSourceId = "route-source"
         val routeLayerId  = "route-layer"
 
@@ -208,7 +209,7 @@ actual fun MapScreen(
         }
     }
 
-    // ── Efecto 4: CU-09 paradas aprobadas (naranjas) ────────────────────
+    // ── Efecto 4: CU-09 paradas aprobadas (naranjas) ─────────────────────
     LaunchedEffect(routeStops, loadedStyle) {
         val style = loadedStyle ?: return@LaunchedEffect
         val stopsSourceId = "stops-source"
@@ -235,7 +236,8 @@ actual fun MapScreen(
         }
     }
 
-    // ── Efecto 5: CU-13 postcondición — incidentes pendientes (rojos) ──────
+    // ── Efecto 5: CU-13 — incidentes activos <4h (círculos rojos) ─────────
+    // Se actualiza cada vez que el ViewModel refresca la lista (cada 5 min).
     LaunchedEffect(incidentes, loadedStyle) {
         val style = loadedStyle ?: return@LaunchedEffect
 
@@ -254,6 +256,7 @@ actual fun MapScreen(
                 CircleLayer(incLayerId, incSourceId).apply {
                     setProperties(
                         PropertyFactory.circleRadius(12f),
+                        // Rojo advertencia — diferente a paradas naranjas (CU-09)
                         PropertyFactory.circleColor(android.graphics.Color.parseColor("#E53935")),
                         PropertyFactory.circleStrokeWidth(2f),
                         PropertyFactory.circleStrokeColor(android.graphics.Color.WHITE),
@@ -266,7 +269,7 @@ actual fun MapScreen(
         }
     }
 
-    // ── UI ─────────────────────────────────────────────────────────────
+    // ── UI ────────────────────────────────────────────────────────────────
     Box(modifier = Modifier.fillMaxSize()) {
         AndroidView(
             factory  = { mapView },
