@@ -13,10 +13,9 @@ import org.maplibre.android.camera.CameraUpdateFactory
 import org.maplibre.android.geometry.LatLng
 import org.maplibre.android.maps.MapLibreMap
 import org.maplibre.android.maps.Style
+import org.maplibre.android.style.layers.CircleLayer
 import org.maplibre.android.style.layers.PropertyFactory
-import org.maplibre.android.style.layers.SymbolLayer
 import org.maplibre.android.style.sources.GeoJsonSource
-import java.io.File
 
 private const val MARKER_SOURCE = "incident-marker-source"
 private const val MARKER_LAYER  = "incident-marker-layer"
@@ -35,10 +34,11 @@ actual fun XalapaIncidentMap(
     val xalapaCenter = LatLng(19.5273, -96.9239)
     val mapView = rememberMapViewWithLifecycle()
 
-    var mapLibreMap  by remember { mutableStateOf<MapLibreMap?>(null) }
+    var mapLibreMap by remember { mutableStateOf<MapLibreMap?>(null) }
     var loadedStyle  by remember { mutableStateOf<Style?>(null) }
 
-    LaunchedEffect(mapStylePath, isDarkMode) {
+    // Inicialización del mapa — sólo una vez
+    LaunchedEffect(Unit) {
         mapView.getMapAsync { map ->
             mapLibreMap = map
             map.moveCamera(CameraUpdateFactory.newLatLngZoom(xalapaCenter, 13.0))
@@ -49,55 +49,63 @@ actual fun XalapaIncidentMap(
             }
 
             val styleFileName = if (isDarkMode) "style_dark.json" else "style.json"
+
             val styleJson = try {
                 context.assets.open(styleFileName).bufferedReader().use { it.readText() }
             } catch (e: Exception) {
+                // Fallback a OpenStreetMap tiles (no requiere API key)
                 """
                 {
                   "version": 8,
                   "sources": {
-                    "carto-light": {
+                    "osm": {
                       "type": "raster",
-                      "tiles": ["https://a.basemaps.cartocdn.com/light_all/{z}/{x}/{y}@2x.png"],
-                      "tileSize": 256
+                      "tiles": ["https://tile.openstreetmap.org/{z}/{x}/{y}.png"],
+                      "tileSize": 256,
+                      "attribution": "© OpenStreetMap contributors"
                     }
                   },
                   "layers": [{
-                    "id": "carto-light-layer",
+                    "id": "osm-layer",
                     "type": "raster",
-                    "source": "carto-light"
+                    "source": "osm"
                   }]
                 }
                 """.trimIndent()
             }
 
             val finalStyle = if (mapStylePath != null) {
-                val mapDir = File(mapStylePath).parent ?: ""
+                val mapDir = java.io.File(mapStylePath).parent ?: ""
                 styleJson.replace("{mbtiles_path}", mapDir)
             } else {
                 styleJson
             }
 
-            loadedStyle = null
             map.setStyle(Style.Builder().fromJson(finalStyle)) { style ->
                 loadedStyle = style
+
+                // Fuente GeoJSON para el marcador
                 style.addSource(GeoJsonSource(MARKER_SOURCE))
+
+                // CircleLayer: no depende de sprites — funciona siempre
                 style.addLayer(
-                    SymbolLayer(MARKER_LAYER, MARKER_SOURCE).apply {
+                    CircleLayer(MARKER_LAYER, MARKER_SOURCE).apply {
                         setProperties(
-                            PropertyFactory.iconImage("marker-15"),
-                            PropertyFactory.iconSize(2.0f),
-                            PropertyFactory.iconColor(android.graphics.Color.RED),
-                            PropertyFactory.iconAllowOverlap(true),
-                            PropertyFactory.iconIgnorePlacement(true),
+                            PropertyFactory.circleRadius(10f),
+                            PropertyFactory.circleColor(android.graphics.Color.RED),
+                            PropertyFactory.circleStrokeWidth(2f),
+                            PropertyFactory.circleStrokeColor(android.graphics.Color.WHITE),
                         )
                     }
                 )
+
+                // Renderizar posición inicial si ya hay una seleccionada
                 updateMarker(style, selectedLat, selectedLng)
             }
         }
     }
 
+    // Actualizar marcador cuando cambia la posición seleccionada
     LaunchedEffect(selectedLat, selectedLng, loadedStyle) {
         loadedStyle?.let { style ->
             updateMarker(style, selectedLat, selectedLng)
@@ -112,8 +120,6 @@ actual fun XalapaIncidentMap(
 
 private fun updateMarker(style: Style, lat: Double, lng: Double) {
     val source = style.getSourceAs<GeoJsonSource>(MARKER_SOURCE) ?: return
-    // Usar .toJson() para pasar String en lugar de Feature directamente,
-    // ya que la versión de MapLibre del proyecto no acepta Feature como argumento
     val featureJson = Feature.fromGeometry(Point.fromLngLat(lng, lat)).toJson()
     source.setGeoJson(featureJson)
 }
