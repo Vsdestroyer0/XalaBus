@@ -4,9 +4,11 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.xalabus.data.repository.RouteRepository
 import com.example.xalabus.DBD.RouteEntity
+import com.example.xalabus.DBD.StopEntity
 import com.example.xalabus.core.util.MapFileManager
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.serialization.json.Json
 import org.jetbrains.compose.resources.ExperimentalResourceApi
@@ -36,6 +38,21 @@ class RouteViewModel(
 
     private val _selectedRoutePoints = MutableStateFlow<List<List<List<Double>>>>(emptyList())
     val selectedRoutePoints: StateFlow<List<List<List<Double>>>> = _selectedRoutePoints
+
+    /** CU-09: última ubicación GPS del usuario (lat, lng) */
+    private val _userLocation = MutableStateFlow<Pair<Double, Double>?>(null)
+    val userLocation: StateFlow<Pair<Double, Double>?> = _userLocation.asStateFlow()
+
+    fun updateUserLocation(lat: Double, lng: Double) {
+        _userLocation.value = lat to lng
+    }
+
+    private val _routeStops = MutableStateFlow<List<StopEntity>>(emptyList())
+    val routeStops: StateFlow<List<StopEntity>> = _routeStops.asStateFlow()
+
+    fun loadLocalStops(routeId: String) {
+        _routeStops.value = repository.getStopsForRoute(routeId)
+    }
 
     // 1. El texto que el usuario escribe en la barra
     private val _searchQuery = MutableStateFlow("")
@@ -182,6 +199,7 @@ class RouteViewModel(
 
                 // Solo recuperamos la geometría (el dibujo de la línea en el mapa)
                 _selectedRoutePoints.value = getRoutePoints(routeId)
+                loadLocalStops(routeId)
 
             } catch (e: Exception) {
                 println("Error al seleccionar ruta $routeId: ${e.message}")

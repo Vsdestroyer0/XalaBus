@@ -36,6 +36,12 @@ data class RouteStop(
     val latitude: Double,
     val longitude: Double,
     val status: String = "pending",
+    val popularity: Int = 1,
     @SerialName("created_at")
     val createdAt: String? = null
+)
+
+@Serializable
+data class PopularityUpdate(
+    val popularity: Int
 )

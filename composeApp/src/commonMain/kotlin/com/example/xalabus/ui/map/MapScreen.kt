@@ -11,5 +11,6 @@ expect fun MapScreen(
     fileManager: MapFileManager,
     viewModel: RouteViewModel,
     isDarkMode: Boolean,
-    routeTimeViewModel: RouteTimeViewModel
+    routeTimeViewModel: RouteTimeViewModel,
+    onUserLocationChanged: (lat: Double, lng: Double) -> Unit = { _, _ -> },
 )

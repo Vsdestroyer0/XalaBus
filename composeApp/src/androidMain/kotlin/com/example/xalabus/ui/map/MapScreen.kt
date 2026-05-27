@@ -14,6 +14,8 @@ import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
 import com.example.xalabus.ui.viewmodel.RouteTimeViewModel
 import com.example.xalabus.ui.viewmodel.RouteViewModel
+import com.mapbox.geojson.Feature
+import com.mapbox.geojson.FeatureCollection
 import com.mapbox.geojson.LineString
 import com.mapbox.geojson.Point
 import org.maplibre.android.camera.CameraUpdateFactory
@@ -21,11 +23,15 @@ import org.maplibre.android.geometry.LatLng
 import org.maplibre.android.geometry.LatLngBounds
 import org.maplibre.android.location.LocationComponentActivationOptions
 import org.maplibre.android.location.LocationComponentOptions
+import org.maplibre.android.location.engine.LocationEngineCallback
+import org.maplibre.android.location.engine.LocationEngineRequest
+import org.maplibre.android.location.engine.LocationEngineResult
 import org.maplibre.android.location.modes.CameraMode
 import org.maplibre.android.location.modes.RenderMode
 import org.maplibre.android.maps.MapLibreMap
 import org.maplibre.android.maps.MapView
 import org.maplibre.android.maps.Style
+import org.maplibre.android.style.layers.CircleLayer
 import org.maplibre.android.style.layers.LineLayer
 import org.maplibre.android.style.layers.Property
 import org.maplibre.android.style.layers.PropertyFactory
@@ -39,11 +45,13 @@ actual fun MapScreen(
     fileManager: MapFileManager,
     viewModel: RouteViewModel,
     isDarkMode: Boolean,
-    routeTimeViewModel: RouteTimeViewModel
+    routeTimeViewModel: RouteTimeViewModel,
+    onUserLocationChanged: (lat: Double, lng: Double) -> Unit
 ) {
     val context = LocalContext.current
     val mapPath by viewModel.mapFilePath.collectAsState()
     val routePoints by viewModel.selectedRoutePoints.collectAsState()
+    val routeStops by viewModel.routeStops.collectAsState()
 
     val xalapaCenter = LatLng(19.5273, -96.9239)
     val mapView = rememberMapViewWithLifecycle()
@@ -57,7 +65,9 @@ actual fun MapScreen(
     ) { permissions ->
         val granted = permissions[Manifest.permission.ACCESS_FINE_LOCATION] == true
         if (granted) {
-            loadedStyle?.let { style -> mapLibreMap?.let { enableLocation(it, style, context) } }
+            loadedStyle?.let { style ->
+                mapLibreMap?.let { enableLocation(it, style, context, onUserLocationChanged) }
+            }
         }
     }
 
@@ -92,7 +102,7 @@ actual fun MapScreen(
                         context, Manifest.permission.ACCESS_FINE_LOCATION
                     ) == PackageManager.PERMISSION_GRANTED
                 ) {
-                    enableLocation(map, style, context)
+                    enableLocation(map, style, context, onUserLocationChanged)
                 }
                 loadedStyle = style
             }
@@ -139,6 +149,35 @@ actual fun MapScreen(
         }
     }
 
+    // ── Efecto 3: CU-09 paradas aprobadas en el mapa ─────────────────────────
+    LaunchedEffect(routeStops, loadedStyle) {
+        val style = loadedStyle ?: return@LaunchedEffect
+        val stopsSourceId = "stops-source"
+        val stopsLayerId = "stops-layer"
+
+        val features = routeStops.map { stop ->
+            Feature.fromGeometry(Point.fromLngLat(stop.lng, stop.lat))
+        }
+        val collection = FeatureCollection.fromFeatures(features)
+
+        val existing = style.getSourceAs<GeoJsonSource>(stopsSourceId)
+        if (existing == null && features.isNotEmpty()) {
+            style.addSource(GeoJsonSource(stopsSourceId, collection.toJson()))
+            style.addLayer(
+                CircleLayer(stopsLayerId, stopsSourceId).apply {
+                    setProperties(
+                        PropertyFactory.circleRadius(8f),
+                        PropertyFactory.circleColor(android.graphics.Color.parseColor("#FF9800")),
+                        PropertyFactory.circleStrokeWidth(2f),
+                        PropertyFactory.circleStrokeColor(android.graphics.Color.WHITE)
+                    )
+                }
+            )
+        } else {
+            existing?.setGeoJson(collection.toJson())
+        }
+    }
+
     // ── UI: solo el mapa (CU-11 se muestra en el bottom sheet de App.kt) ─────
     Box(modifier = Modifier.fillMaxSize()) {
         AndroidView(
@@ -148,7 +187,12 @@ actual fun MapScreen(
     }
 }
 
-private fun enableLocation(map: MapLibreMap, style: Style, context: android.content.Context) {
+private fun enableLocation(
+    map: MapLibreMap,
+    style: Style,
+    context: android.content.Context,
+    onUserLocationChanged: (lat: Double, lng: Double) -> Unit
+) {
     val locationComponent = map.locationComponent
 
     val options = LocationComponentOptions.builder(context)
@@ -166,6 +210,24 @@ private fun enableLocation(map: MapLibreMap, style: Style, context: android.cont
     locationComponent.isLocationComponentEnabled = true
     locationComponent.renderMode = RenderMode.GPS
     locationComponent.cameraMode  = CameraMode.NONE
+
+    val request = LocationEngineRequest.Builder(2_000L)
+        .setPriority(LocationEngineRequest.PRIORITY_HIGH_ACCURACY)
+        .setFastestInterval(1_000L)
+        .build()
+
+    locationComponent.locationEngine?.requestLocationUpdates(
+        request,
+        object : LocationEngineCallback<LocationEngineResult> {
+            override fun onSuccess(result: LocationEngineResult?) {
+                result?.lastLocation?.let {
+                    onUserLocationChanged(it.latitude, it.longitude)
+                }
+            }
+            override fun onFailure(exception: Exception) {}
+        },
+        null
+    )
 }
 
 @Composable

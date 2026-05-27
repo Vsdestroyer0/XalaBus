@@ -45,7 +45,7 @@ import org.jetbrains.compose.resources.decodeToImageBitmap
 import xalabus.composeapp.generated.resources.*
 import xalabus.composeapp.generated.resources.Res
 
-private enum class AppDestination { AUTH, MAIN, ADMIN_DASHBOARD }
+private enum class AppDestination { AUTH, MAIN, ADMIN_LOGIN, ADMIN_DASHBOARD }
 
 // CU-03: agregado FORGOT_PASSWORD al enum de pantallas de auth
 private enum class AuthScreen { LOGIN, REGISTER, FORGOT_PASSWORD }
@@ -71,7 +71,9 @@ fun App(
     val viewModel      = remember { RouteViewModel(repository, fileManager) }
     val authViewModel  = remember { AuthViewModel() }
     val adminViewModel = remember { AdminViewModel() }
-    val reportsViewModel = remember { com.example.xalabus.ui.viewmodel.ReportsViewModel() }
+    val reportsViewModel = remember(repository) {
+        com.example.xalabus.ui.viewmodel.ReportsViewModel(routeRepository = repository)
+    }
     // CU-03: ViewModel de recuperación de contraseña
     val forgotPasswordViewModel = remember { ForgotPasswordViewModel() }
     // CU-10: ViewModel de favoritos
@@ -133,14 +135,23 @@ fun App(
                         authViewModel.signOut()
                         isAuthenticated = false
                     },
+                    onAdminRequest   = { destination = AppDestination.ADMIN_LOGIN },
                     reportsViewModel   = reportsViewModel,
                     favoritosViewModel = favoritosViewModel,
                     incidentViewModel  = incidentViewModel,
                     routeTimeViewModel = routeTimeViewModel
                 )
 
+                AppDestination.ADMIN_LOGIN -> AdminLoginScreen(
+                    viewModel = adminViewModel,
+                    onLoginSuccess = { destination = AppDestination.ADMIN_DASHBOARD },
+                    onBack = { destination = AppDestination.MAIN }
+                )
+
                 AppDestination.ADMIN_DASHBOARD -> AdminDashboardScreen(
                     viewModel  = adminViewModel,
+                    reportsRepository = com.example.xalabus.data.reports.ReportsRepository(),
+                    routeRepository = repository,
                     onSignOut  = {
                         adminViewModel.signOut()
                         destination = AppDestination.MAIN
@@ -161,6 +172,7 @@ private fun MainAppContent(
     onToggleDarkMode: () -> Unit,
     onSignInRequest: () -> Unit,
     onSignOut: () -> Unit,
+    onAdminRequest: () -> Unit,
     reportsViewModel: com.example.xalabus.ui.viewmodel.ReportsViewModel,
     favoritosViewModel: FavoritosViewModel,
     incidentViewModel: IncidentViewModel,
@@ -294,6 +306,18 @@ private fun MainAppContent(
                         )
                     }
 
+                    // CU-09: panel de administración para revisar paradas
+                    NavigationDrawerItem(
+                        icon   = { Icon(Icons.Default.AdminPanelSettings, contentDescription = null) },
+                        label  = { Text("Administración") },
+                        selected = false,
+                        onClick  = {
+                            scope.launch { drawerState.close() }
+                            onAdminRequest()
+                        },
+                        modifier = Modifier.padding(NavigationDrawerItemDefaults.ItemPadding)
+                    )
+
                     HorizontalDivider(
                         modifier = Modifier.padding(vertical = 8.dp),
                         color    = MaterialTheme.colorScheme.outline
@@ -388,6 +412,8 @@ fun MapDetailView(
 
     var routeReportMessage by remember { mutableStateOf("") }
     val reportState by reportsViewModel.uiState.collectAsState()
+    val stopState by reportsViewModel.stopUiState.collectAsState()
+    val userLocation by viewModel.userLocation.collectAsState()
 
     // CU-10: estado de favoritos para esta ruta
     val isFavorito by favoritosViewModel.isCurrentRouteFavorite.collectAsState()
@@ -406,6 +432,16 @@ fun MapDetailView(
     LaunchedEffect(routePoints) {
         if (routePoints.isNotEmpty()) {
             routeTimeViewModel.calculateFromGeometry(routePoints)
+        }
+    }
+
+    // CU-09: sincronizar paradas aprobadas al abrir la ruta (si hay internet)
+    LaunchedEffect(parsedRouteId) {
+        if (parsedRouteId > 0) {
+            viewModel.loadLocalStops(routeId)
+            reportsViewModel.syncAcceptedStopsToLocal(parsedRouteId) {
+                viewModel.loadLocalStops(routeId)
+            }
         }
     }
 
@@ -571,6 +607,67 @@ fun MapDetailView(
                         ?: "Consultando..."
                 )
 
+                Spacer(Modifier.height(16.dp))
+
+                // ── CU-09: Agregar parada ─────────────────────────────────────
+                OutlinedButton(
+                    onClick = {
+                        userLocation?.let { (lat, lng) ->
+                            reportsViewModel.submitStopHere(parsedRouteId, lat, lng)
+                        }
+                    },
+                    modifier = Modifier.fillMaxWidth(),
+                    enabled = stopState !is com.example.xalabus.ui.viewmodel.StopUiState.Loading &&
+                        userLocation != null && parsedRouteId > 0 && isAuthenticated
+                ) {
+                    if (stopState is com.example.xalabus.ui.viewmodel.StopUiState.Loading) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(18.dp),
+                            strokeWidth = 2.dp
+                        )
+                        Spacer(Modifier.width(8.dp))
+                    } else {
+                        Icon(Icons.Default.AddLocation, contentDescription = null)
+                        Spacer(Modifier.width(8.dp))
+                    }
+                    Text("Aquí hay una parada")
+                }
+
+                when {
+                    !isAuthenticated -> {
+                        Text(
+                            "Inicia sesión para reportar una parada.",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.padding(top = 4.dp)
+                        )
+                    }
+                    userLocation == null -> {
+                        Text(
+                            "Activa el GPS para reportar una parada en tu ubicación.",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.padding(top = 4.dp)
+                        )
+                    }
+                    stopState is com.example.xalabus.ui.viewmodel.StopUiState.Error -> {
+                        Text(
+                            (stopState as com.example.xalabus.ui.viewmodel.StopUiState.Error).message,
+                            color = MaterialTheme.colorScheme.error,
+                            style = MaterialTheme.typography.labelSmall,
+                            modifier = Modifier.padding(top = 4.dp)
+                        )
+                    }
+                    stopState is com.example.xalabus.ui.viewmodel.StopUiState.Success -> {
+                        Text(
+                            (stopState as com.example.xalabus.ui.viewmodel.StopUiState.Success).message,
+                            color = MaterialTheme.colorScheme.primary,
+                            style = MaterialTheme.typography.labelSmall,
+                            modifier = Modifier.padding(top = 4.dp)
+                        )
+                    }
+                }
+
                 Spacer(Modifier.height(24.dp))
                 Text(
                     "Reportar cambios en la ruta",
@@ -657,7 +754,10 @@ fun MapDetailView(
                 fileManager        = fileManager,
                 viewModel          = viewModel,
                 isDarkMode         = isDarkMode,
-                routeTimeViewModel = routeTimeViewModel
+                routeTimeViewModel = routeTimeViewModel,
+                onUserLocationChanged = { lat, lng ->
+                    viewModel.updateUserLocation(lat, lng)
+                }
             )
             FilledIconButton(
                 onClick  = onBack,

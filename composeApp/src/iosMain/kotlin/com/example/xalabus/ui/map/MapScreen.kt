@@ -15,7 +15,8 @@ actual fun MapScreen(
     fileManager: MapFileManager,
     viewModel: RouteViewModel,
     isDarkMode: Boolean,
-    routeTimeViewModel: RouteTimeViewModel
+    routeTimeViewModel: RouteTimeViewModel,
+    onUserLocationChanged: (lat: Double, lng: Double) -> Unit
 ) {
     Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
         Text("Map not yet implemented for iOS")
