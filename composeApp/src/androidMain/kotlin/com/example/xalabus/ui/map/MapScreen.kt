@@ -12,6 +12,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
+import com.example.xalabus.ui.viewmodel.IncidentViewModel
 import com.example.xalabus.ui.viewmodel.RouteTimeViewModel
 import com.example.xalabus.ui.viewmodel.RouteViewModel
 import com.mapbox.geojson.Feature
@@ -46,12 +47,14 @@ actual fun MapScreen(
     viewModel: RouteViewModel,
     isDarkMode: Boolean,
     routeTimeViewModel: RouteTimeViewModel,
+    incidentViewModel: IncidentViewModel,
     onUserLocationChanged: (lat: Double, lng: Double) -> Unit
 ) {
     val context = LocalContext.current
-    val mapPath by viewModel.mapFilePath.collectAsState()
+    val mapPath    by viewModel.mapFilePath.collectAsState()
     val routePoints by viewModel.selectedRoutePoints.collectAsState()
-    val routeStops by viewModel.routeStops.collectAsState()
+    val routeStops  by viewModel.routeStops.collectAsState()
+    val incidentes  by incidentViewModel.incidentes.collectAsState()
 
     val xalapaCenter = LatLng(19.5273, -96.9239)
     val mapView = rememberMapViewWithLifecycle()
@@ -59,7 +62,7 @@ actual fun MapScreen(
     var mapLibreMap by remember { mutableStateOf<MapLibreMap?>(null) }
     var loadedStyle  by remember { mutableStateOf<Style?>(null) }
 
-    // --- GESTIÓN DE PERMISOS ---
+    // ── Permisos de ubicación ────────────────────────────────────────────
     val permissionLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()
     ) { permissions ->
@@ -72,6 +75,7 @@ actual fun MapScreen(
     }
 
     LaunchedEffect(Unit) {
+        // Solicitar permisos si no están concedidos
         if (ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION)
             != PackageManager.PERMISSION_GRANTED
         ) {
@@ -82,9 +86,11 @@ actual fun MapScreen(
                 )
             )
         }
+        // CU-13 postcondición: cargar incidentes al abrir el mapa
+        incidentViewModel.cargarIncidentes()
     }
 
-    // ── Efecto 1: Inicializar mapa — solo una vez por instancia de MapView ────
+    // ── Efecto 1: Inicializar mapa ───────────────────────────────────────
     LaunchedEffect(Unit) {
         mapView.getMapAsync { map ->
             mapLibreMap = map
@@ -93,9 +99,7 @@ actual fun MapScreen(
             val styleFileName = if (isDarkMode) "style_dark.json" else "style.json"
             val styleJson = try {
                 context.assets.open(styleFileName).bufferedReader().use { it.readText() }
-            } catch (e: Exception) {
-                ""
-            }
+            } catch (e: Exception) { "" }
 
             val mbtilesDir = if (mapPath != null) {
                 File(mapPath!!).parent
@@ -118,11 +122,7 @@ actual fun MapScreen(
                       "attribution": "© OpenStreetMap contributors"
                     }
                   },
-                  "layers": [{
-                    "id": "osm-layer",
-                    "type": "raster",
-                    "source": "osm"
-                  }]
+                  "layers": [{"id": "osm-layer", "type": "raster", "source": "osm"}]
                 }
                 """.trimIndent()
             }
@@ -140,16 +140,13 @@ actual fun MapScreen(
         }
     }
 
-    // ── Efecto 2: Re-aplicar estilo si cambia isDarkMode o mapPath ───────────
+    // ── Efecto 2: Re-aplicar estilo si cambia isDarkMode o mapPath ──────────
     LaunchedEffect(mapPath, isDarkMode) {
         val map = mapLibreMap ?: return@LaunchedEffect
-
         val styleFileName = if (isDarkMode) "style_dark.json" else "style.json"
         val styleJson = try {
             context.assets.open(styleFileName).bufferedReader().use { it.readText() }
-        } catch (e: Exception) {
-            ""
-        }
+        } catch (e: Exception) { "" }
 
         val mbtilesDir = if (mapPath != null) {
             File(mapPath!!).parent
@@ -173,11 +170,9 @@ actual fun MapScreen(
         }
     }
 
-    // ── Efecto 3: Dibujar/actualizar la ruta cuando cambian los puntos ────────
+    // ── Efecto 3: Dibujar/actualizar ruta ─────────────────────────────────
     LaunchedEffect(routePoints, loadedStyle) {
         val style = loadedStyle ?: return@LaunchedEffect
-        val map   = mapLibreMap  ?: return@LaunchedEffect
-
         val routeSourceId = "route-source"
         val routeLayerId  = "route-layer"
 
@@ -213,15 +208,13 @@ actual fun MapScreen(
         }
     }
 
-    // ── Efecto 4: CU-09 paradas aprobadas en el mapa ─────────────────────────
+    // ── Efecto 4: CU-09 paradas aprobadas (naranjas) ────────────────────
     LaunchedEffect(routeStops, loadedStyle) {
         val style = loadedStyle ?: return@LaunchedEffect
         val stopsSourceId = "stops-source"
-        val stopsLayerId = "stops-layer"
+        val stopsLayerId  = "stops-layer"
 
-        val features = routeStops.map { stop ->
-            Feature.fromGeometry(Point.fromLngLat(stop.lng, stop.lat))
-        }
+        val features   = routeStops.map { stop -> Feature.fromGeometry(Point.fromLngLat(stop.lng, stop.lat)) }
         val collection = FeatureCollection.fromFeatures(features)
 
         val existing = style.getSourceAs<GeoJsonSource>(stopsSourceId)
@@ -242,10 +235,41 @@ actual fun MapScreen(
         }
     }
 
-    // ── UI ────────────────────────────────────────────────────────────────────
+    // ── Efecto 5: CU-13 postcondición — incidentes pendientes (rojos) ──────
+    LaunchedEffect(incidentes, loadedStyle) {
+        val style = loadedStyle ?: return@LaunchedEffect
+
+        val incSourceId = "incidentes-source"
+        val incLayerId  = "incidentes-layer"
+
+        val features = incidentes.map { inc ->
+            Feature.fromGeometry(Point.fromLngLat(inc.longitud, inc.latitud))
+        }
+        val collection = FeatureCollection.fromFeatures(features)
+
+        val existing = style.getSourceAs<GeoJsonSource>(incSourceId)
+        if (existing == null) {
+            style.addSource(GeoJsonSource(incSourceId, collection.toJson()))
+            style.addLayer(
+                CircleLayer(incLayerId, incSourceId).apply {
+                    setProperties(
+                        PropertyFactory.circleRadius(12f),
+                        PropertyFactory.circleColor(android.graphics.Color.parseColor("#E53935")),
+                        PropertyFactory.circleStrokeWidth(2f),
+                        PropertyFactory.circleStrokeColor(android.graphics.Color.WHITE),
+                        PropertyFactory.circleOpacity(0.9f)
+                    )
+                }
+            )
+        } else {
+            existing.setGeoJson(collection.toJson())
+        }
+    }
+
+    // ── UI ─────────────────────────────────────────────────────────────
     Box(modifier = Modifier.fillMaxSize()) {
         AndroidView(
-            factory = { mapView },
+            factory  = { mapView },
             modifier = Modifier.fillMaxSize()
         )
     }
