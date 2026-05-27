@@ -57,7 +57,7 @@ actual fun MapScreen(
     val mapView = rememberMapViewWithLifecycle()
 
     var mapLibreMap by remember { mutableStateOf<MapLibreMap?>(null) }
-    var loadedStyle by remember { mutableStateOf<Style?>(null) }
+    var loadedStyle  by remember { mutableStateOf<Style?>(null) }
 
     // --- GESTIÓN DE PERMISOS ---
     val permissionLauncher = rememberLauncherForActivityResult(
@@ -84,12 +84,14 @@ actual fun MapScreen(
         }
     }
 
-    // ── Efecto 1: Inicializar mapa y cargar estilo ────────────────────────────
-    LaunchedEffect(mapPath, isDarkMode) {
-        val path = mapPath ?: return@LaunchedEffect
+    // ── Efecto 1: Inicializar mapa — solo una vez por instancia de MapView ────
+    LaunchedEffect(Unit) {
         mapView.getMapAsync { map ->
             mapLibreMap = map
             map.moveCamera(CameraUpdateFactory.newLatLngZoom(xalapaCenter, 13.0))
+
+            val path = mapPath
+            if (path == null) return@getMapAsync
 
             val styleFileName = if (isDarkMode) "style_dark.json" else "style.json"
             val styleJson = context.assets.open(styleFileName).bufferedReader().use { it.readText() }
@@ -109,7 +111,29 @@ actual fun MapScreen(
         }
     }
 
-    // ── Efecto 2: Dibujar/actualizar la ruta cuando cambian los puntos ────────
+    // ── Efecto 2: Re-aplicar estilo si cambia isDarkMode o mapPath ───────────
+    LaunchedEffect(mapPath, isDarkMode) {
+        val map  = mapLibreMap ?: return@LaunchedEffect
+        val path = mapPath     ?: return@LaunchedEffect
+
+        val styleFileName = if (isDarkMode) "style_dark.json" else "style.json"
+        val styleJson = context.assets.open(styleFileName).bufferedReader().use { it.readText() }
+        val mapDir = File(path).parent ?: ""
+        val finalStyle = styleJson.replace("{mbtiles_path}", mapDir)
+
+        loadedStyle = null
+        map.setStyle(Style.Builder().fromJson(finalStyle)) { style ->
+            if (ContextCompat.checkSelfPermission(
+                    context, Manifest.permission.ACCESS_FINE_LOCATION
+                ) == PackageManager.PERMISSION_GRANTED
+            ) {
+                enableLocation(map, style, context, onUserLocationChanged)
+            }
+            loadedStyle = style
+        }
+    }
+
+    // ── Efecto 3: Dibujar/actualizar la ruta cuando cambian los puntos ────────
     LaunchedEffect(routePoints, loadedStyle) {
         val style = loadedStyle ?: return@LaunchedEffect
         val map   = mapLibreMap  ?: return@LaunchedEffect
@@ -149,7 +173,7 @@ actual fun MapScreen(
         }
     }
 
-    // ── Efecto 3: CU-09 paradas aprobadas en el mapa ─────────────────────────
+    // ── Efecto 4: CU-09 paradas aprobadas en el mapa ─────────────────────────
     LaunchedEffect(routeStops, loadedStyle) {
         val style = loadedStyle ?: return@LaunchedEffect
         val stopsSourceId = "stops-source"
@@ -178,7 +202,7 @@ actual fun MapScreen(
         }
     }
 
-    // ── UI: solo el mapa (CU-11 se muestra en el bottom sheet de App.kt) ─────
+    // ── UI ────────────────────────────────────────────────────────────────────
     Box(modifier = Modifier.fillMaxSize()) {
         AndroidView(
             factory = { mapView },
