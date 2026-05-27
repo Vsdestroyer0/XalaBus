@@ -1,57 +1,54 @@
 package com.example.xalabus.ui.reports
 
-import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.filled.AttachFile
 import androidx.compose.material.icons.filled.CheckCircle
-import androidx.compose.material.icons.filled.LocationOn
-import androidx.compose.material.icons.filled.PhotoCamera
+import androidx.compose.material.icons.filled.MyLocation
+import androidx.compose.material.icons.filled.Place
 import androidx.compose.material.icons.filled.ReportProblem
 import androidx.compose.material.icons.filled.Send
+import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.example.xalabus.ui.viewmodel.IncidentUiState
 import com.example.xalabus.ui.viewmodel.IncidentViewModel
-import com.example.xalabus.ui.viewmodel.isWithinXalapa
-
-// ─── Bounding-box de Xalapa (mismos valores que IncidentViewModel) ────────────
-private const val LAT_MIN = 19.48
-private const val LAT_MAX = 19.62
-private const val LNG_MIN = -97.00
-private const val LNG_MAX = -96.85
 
 /**
- * CU-13 — Pantalla para reportar algún inconveniente con la ruta.
+ * CU-13 — Reportar algún inconveniente con la ruta.
  *
- * Flujo normal (F1-F6):
- *  1. Usuario accede y está registrado.
- *  2. Selecciona la opción de reportar → esta pantalla.
- *  3. Toca el mapa para marcar la ubicación del inconveniente.
- *  4. Escribe la descripción en el cuadro de texto.
- *  5. Opcionalmente adjunta foto (placeholder — extensión futura).
- *  6. Pulsa "Subir advertencia" → el sistema guarda el reporte.
+ * Flujo normal:
+ *  1. Acceder a la aplicación (estar registrado — controlado desde App.kt).
+ *  2. Seleccionar la opción de añadir una advertencia.
+ *  3. Tocar el mapa interactivo para marcar la ubicación del incidente.
+ *  4. Describir la advertencia en el cuadro de texto.
+ *  5. (Opcional) Adjuntar una foto.
+ *  6. Subir la advertencia → el sistema la guarda y la hace visible.
  *
- * Flujos alternativos manejados:
- *  - FA-01 (C2): punto fuera del mapa → "Punto inválido"
- *  - FA-02 (C3): cuadro de texto vacío al enviar → validación mostrada
- *
- * Excepción:
- *  - Ex-01 (C4): el sistema no carga los datos → "Error al cargar datos"
- *
- * Post-condición: la advertencia queda registrada y visible para otros usuarios.
+ * Flujos alternativos y excepciones cubiertos según tabla de casos de prueba:
+ *  C2 / FA-01 — Punto fuera del mapa → "Punto inválido" (validado en ViewModel)
+ *  C3 / FA-02 — Cuadro de texto vacío → validación visual + botón deshabilitado
+ *  C4 / Ex-01 — Error de red/datos    → "Error al cargar datos"
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -59,14 +56,30 @@ fun ReportIncidentScreen(
     viewModel: IncidentViewModel,
     onDismiss: () -> Unit
 ) {
-    val uiState       by viewModel.uiState.collectAsState()
-    val selectedLat   by viewModel.selectedLat.collectAsState()
-    val selectedLng   by viewModel.selectedLng.collectAsState()
-    val pointSelected by viewModel.pointSelected.collectAsState()
+    val uiState    by viewModel.uiState.collectAsState()
+    val selectedLat by viewModel.selectedLat.collectAsState()
+    val selectedLng by viewModel.selectedLng.collectAsState()
 
     var descripcion by remember { mutableStateOf("") }
-    // Coordenadas del toque en el canvas (para dibujar el pin)
-    var tapOffset   by remember { mutableStateOf<Offset?>(null) }
+    var mapSize     by remember { mutableStateOf(IntSize.Zero) }
+
+    // Límites del mapa de Xalapa (deben coincidir con IncidentViewModel.Companion)
+    val LAT_MIN = 19.48; val LAT_MAX = 19.60
+    val LNG_MIN = -97.00; val LNG_MAX = -96.85
+
+    // Convierte coordenadas geo → fracción [0,1] dentro del mapa
+    fun latToFraction(lat: Double) = ((LAT_MAX - lat) / (LAT_MAX - LAT_MIN)).coerceIn(0.0, 1.0)
+    fun lngToFraction(lng: Double) = ((lng - LNG_MIN) / (LNG_MAX - LNG_MIN)).coerceIn(0.0, 1.0)
+
+    // Convierte fracción [0,1] → coordenada geo
+    fun fractionToLat(f: Float) = LAT_MAX - f * (LAT_MAX - LAT_MIN)
+    fun fractionToLng(f: Float) = LNG_MIN + f * (LNG_MAX - LNG_MIN)
+
+    val markerFracX = lngToFraction(selectedLng).toFloat()
+    val markerFracY = latToFraction(selectedLat).toFloat()
+
+    val isDescriptionEmpty = descripcion.isBlank()
+    val isPointValid = IncidentViewModel.isWithinXalapa(selectedLat, selectedLng)
 
     // Navegar de vuelta al completar exitosamente
     LaunchedEffect(uiState) {
@@ -79,13 +92,13 @@ fun ReportIncidentScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Reportar inconveniente") },
+                title = { Text("Reportar incidente") },
                 navigationIcon = {
                     IconButton(onClick = {
                         viewModel.resetState()
                         onDismiss()
                     }) {
-                        Icon(Icons.Default.ArrowBack, contentDescription = "Regresar")
+                        Icon(Icons.Default.ArrowBack, "Regresar")
                     }
                 }
             )
@@ -96,122 +109,215 @@ fun ReportIncidentScreen(
                 .fillMaxSize()
                 .padding(padding)
                 .verticalScroll(rememberScrollState())
-                .padding(horizontal = 20.dp, vertical = 16.dp),
+                .padding(horizontal = 20.dp, vertical = 12.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
 
             // ── Encabezado ────────────────────────────────────────────────────
-            Icon(
-                Icons.Default.ReportProblem,
-                contentDescription = null,
-                modifier = Modifier
-                    .size(52.dp)
-                    .align(Alignment.CenterHorizontally),
-                tint = MaterialTheme.colorScheme.error
-            )
-            Text(
-                "¿Qué está pasando en la ruta?",
-                style      = MaterialTheme.typography.headlineSmall,
-                fontWeight = FontWeight.Bold,
-                textAlign  = TextAlign.Center,
-                modifier   = Modifier.fillMaxWidth()
-            )
-
-            // ── Paso 1: Seleccionar punto en el mapa ──────────────────────────
-            Text(
-                "Paso 1 — Toca el mapa para marcar la ubicación",
-                style = MaterialTheme.typography.titleSmall,
-                fontWeight = FontWeight.SemiBold
-            )
-
-            MapPickerCanvas(
-                tapOffset     = tapOffset,
-                pointSelected = pointSelected,
-                uiState       = uiState,
-                onTap         = { offset, lat, lng ->
-                    tapOffset = offset
-                    viewModel.updateLocation(lat, lng)
-                }
-            )
-
-            // Coordenadas del punto seleccionado
-            if (pointSelected) {
-                val coordText = "%.5f, %.5f".format(selectedLat, selectedLng)
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Icon(
-                        Icons.Default.LocationOn,
-                        null,
-                        Modifier.size(16.dp),
-                        tint = if (isWithinXalapa(selectedLat, selectedLng))
-                            MaterialTheme.colorScheme.primary
-                        else
-                            MaterialTheme.colorScheme.error
-                    )
-                    Spacer(Modifier.width(4.dp))
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                Icon(
+                    Icons.Default.ReportProblem,
+                    contentDescription = null,
+                    modifier = Modifier.size(28.dp),
+                    tint = MaterialTheme.colorScheme.error
+                )
+                Column {
                     Text(
-                        coordText,
-                        style = MaterialTheme.typography.labelSmall,
+                        "¿Qué está pasando?",
+                        style = MaterialTheme.typography.titleLarge,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Text(
+                        "Marca el punto en el mapa y describe el incidente.",
+                        style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
             }
 
-            HorizontalDivider()
+            // ── Paso 1: Seleccionar punto en el mapa ──────────────────────────
+            Text(
+                "1. Toca el mapa para marcar la ubicación",
+                style = MaterialTheme.typography.labelLarge,
+                fontWeight = FontWeight.SemiBold,
+                color = MaterialTheme.colorScheme.primary
+            )
+
+            // Mapa interactivo simplificado (cuadrícula con toque)
+            Card(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(220.dp),
+                shape = RoundedCornerShape(12.dp),
+                elevation = CardDefaults.cardElevation(defaultElevation = 3.dp)
+            ) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(
+                            if (isPointValid)
+                                MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.25f)
+                            else
+                                MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.18f)
+                        )
+                        .onSizeChanged { mapSize = it }
+                        .pointerInput(Unit) {
+                            detectTapGestures { offset ->
+                                if (mapSize.width > 0 && mapSize.height > 0) {
+                                    val fracX = offset.x / mapSize.width
+                                    val fracY = offset.y / mapSize.height
+                                    viewModel.updateLocation(
+                                        fractionToLat(fracY),
+                                        fractionToLng(fracX)
+                                    )
+                                }
+                            }
+                        }
+                ) {
+                    // Cuadrícula decorativa
+                    val gridColor = MaterialTheme.colorScheme.outline.copy(alpha = 0.15f)
+                    androidx.compose.foundation.Canvas(
+                        modifier = Modifier.fillMaxSize()
+                    ) {
+                        val cols = 6; val rows = 5
+                        for (i in 1 until cols) {
+                            val x = size.width * i / cols
+                            drawLine(gridColor, Offset(x, 0f), Offset(x, size.height), strokeWidth = 1f)
+                        }
+                        for (j in 1 until rows) {
+                            val y = size.height * j / rows
+                            drawLine(gridColor, Offset(0f, y), Offset(size.width, y), strokeWidth = 1f)
+                        }
+                    }
+
+                    // Etiquetas de referencia
+                    Text(
+                        "N",
+                        modifier = Modifier.align(Alignment.TopCenter).padding(4.dp),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Text(
+                        "Centro",
+                        modifier = Modifier.align(Alignment.Center),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
+                    )
+
+                    // Marcador del punto seleccionado
+                    if (mapSize.width > 0) {
+                        val px = (markerFracX * mapSize.width).dp
+                        val py = (markerFracY * mapSize.height).dp
+                        Box(
+                            modifier = Modifier
+                                .offset(
+                                    x = (markerFracX * mapSize.width - 12).dp,
+                                    y = (markerFracY * mapSize.height - 24).dp
+                                )
+                        ) {
+                            Icon(
+                                Icons.Default.Place,
+                                contentDescription = "Ubicación seleccionada",
+                                modifier = Modifier.size(28.dp),
+                                tint = if (isPointValid)
+                                    MaterialTheme.colorScheme.error
+                                else
+                                    MaterialTheme.colorScheme.errorContainer
+                            )
+                        }
+                    }
+
+                    // Instrucción dentro del mapa
+                    Text(
+                        "Toca para marcar",
+                        modifier = Modifier
+                            .align(Alignment.BottomCenter)
+                            .padding(bottom = 6.dp)
+                            .background(
+                                MaterialTheme.colorScheme.surface.copy(alpha = 0.75f),
+                                RoundedCornerShape(4.dp)
+                            )
+                            .padding(horizontal = 8.dp, vertical = 2.dp),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                }
+            }
+
+            // Chip con coordenadas seleccionadas + validación FA-01
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Icon(
+                    if (isPointValid) Icons.Default.CheckCircle else Icons.Default.Warning,
+                    contentDescription = null,
+                    modifier = Modifier.size(18.dp),
+                    tint = if (isPointValid)
+                        MaterialTheme.colorScheme.primary
+                    else
+                        MaterialTheme.colorScheme.error
+                )
+                Text(
+                    if (isPointValid)
+                        "Lat: ${"%,.4f".format(selectedLat)}  Lng: ${"%,.4f".format(selectedLng)}"
+                    else
+                        "Punto inválido — selecciona dentro de Xalapa",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = if (isPointValid)
+                        MaterialTheme.colorScheme.onSurfaceVariant
+                    else
+                        MaterialTheme.colorScheme.error
+                )
+            }
+
+            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
 
             // ── Paso 2: Descripción ───────────────────────────────────────────
             Text(
-                "Paso 2 — Describe el inconveniente",
-                style      = MaterialTheme.typography.titleSmall,
-                fontWeight = FontWeight.SemiBold
+                "2. Describe el problema",
+                style = MaterialTheme.typography.labelLarge,
+                fontWeight = FontWeight.SemiBold,
+                color = MaterialTheme.colorScheme.primary
             )
 
             OutlinedTextField(
                 value         = descripcion,
                 onValueChange = { descripcion = it },
-                label         = { Text("Descripción de la advertencia") },
-                placeholder   = { Text("ej. La ruta cambió de dirección, hay tráfico bloqueado, bache peligroso...") },
-                modifier      = Modifier
-                    .fillMaxWidth()
-                    .height(130.dp),
-                maxLines = 5,
-                // FA-02 (C3): mostrar borde de error si está vacío tras intentar enviar
-                isError = uiState is IncidentUiState.Error &&
-                    (uiState as IncidentUiState.Error).message.contains("vacío", ignoreCase = true)
+                label         = { Text("Descripción de la advertencia *") },
+                placeholder   = { Text("ej. Bloqueo de vía, desvío de ruta, tráfico intenso...") },
+                modifier      = Modifier.fillMaxWidth().height(130.dp),
+                maxLines      = 5,
+                isError       = isDescriptionEmpty && uiState is IncidentUiState.Error,
+                supportingText = {
+                    if (isDescriptionEmpty) {
+                        Text(
+                            "Campo obligatorio — debes escribir una descripción.",
+                            color = MaterialTheme.colorScheme.error,
+                            style = MaterialTheme.typography.labelSmall
+                        )
+                    }
+                }
             )
 
             // ── Paso 3: Foto (opcional) ───────────────────────────────────────
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .background(
-                        color  = MaterialTheme.colorScheme.surfaceVariant,
-                        shape  = MaterialTheme.shapes.small
-                    )
-                    .padding(12.dp)
+            // C1: la foto es opcional según la tabla de pruebas
+            OutlinedButton(
+                onClick  = { /* extensión futura: Supabase Storage */ },
+                modifier = Modifier.fillMaxWidth(),
+                enabled  = false  // placeholder hasta implementar Storage
             ) {
                 Icon(
-                    Icons.Default.PhotoCamera,
-                    null,
-                    Modifier.size(20.dp),
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant
+                    Icons.Default.AttachFile,
+                    contentDescription = null,
+                    modifier = Modifier.size(18.dp)
                 )
                 Spacer(Modifier.width(8.dp))
-                Column {
-                    Text(
-                        "Agregar foto (opcional)",
-                        style      = MaterialTheme.typography.labelMedium,
-                        fontWeight = FontWeight.Medium
-                    )
-                    Text(
-                        "La opción de adjuntar foto estará disponible próximamente.",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
+                Text("Adjuntar foto (opcional) — próximamente")
             }
 
             // ── Mensaje de error (FA-01, FA-02, Ex-01) ────────────────────────
@@ -220,19 +326,19 @@ fun ReportIncidentScreen(
                     colors = CardDefaults.cardColors(
                         containerColor = MaterialTheme.colorScheme.errorContainer
                     ),
-                    modifier = Modifier.fillMaxWidth()
+                    shape = RoundedCornerShape(8.dp)
                 ) {
                     Row(
                         modifier = Modifier.padding(12.dp),
-                        verticalAlignment = Alignment.CenterVertically
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
                         Icon(
-                            Icons.Default.ReportProblem,
-                            null,
-                            Modifier.size(18.dp),
-                            tint = MaterialTheme.colorScheme.onErrorContainer
+                            Icons.Default.Warning,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.onErrorContainer,
+                            modifier = Modifier.size(18.dp)
                         )
-                        Spacer(Modifier.width(8.dp))
                         Text(
                             (uiState as IncidentUiState.Error).message,
                             color = MaterialTheme.colorScheme.onErrorContainer,
@@ -242,145 +348,38 @@ fun ReportIncidentScreen(
                 }
             }
 
-            Spacer(Modifier.height(8.dp))
+            Spacer(Modifier.height(4.dp))
 
-            // ── Botón principal: Subir advertencia ────────────────────────────
+            // ── Botón enviar ──────────────────────────────────────────────────
+            // C3: deshabilitado si descripción vacía
+            // C2: deshabilitado si punto inválido
             Button(
                 onClick  = { viewModel.submitIncidente(descripcion) },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(52.dp),
-                // Habilitado solo cuando hay descripción y no está cargando
-                enabled  = descripcion.isNotBlank() &&
-                           uiState !is IncidentUiState.Loading,
-                colors = ButtonDefaults.buttonColors(
+                modifier = Modifier.fillMaxWidth().height(52.dp),
+                enabled  = !isDescriptionEmpty && isPointValid && uiState !is IncidentUiState.Loading,
+                colors   = ButtonDefaults.buttonColors(
                     containerColor = MaterialTheme.colorScheme.error,
-                    contentColor   = MaterialTheme.colorScheme.onError
+                    contentColor   = MaterialTheme.colorScheme.onError,
+                    disabledContainerColor = MaterialTheme.colorScheme.surfaceVariant,
+                    disabledContentColor = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             ) {
-                when (uiState) {
-                    is IncidentUiState.Loading -> {
-                        CircularProgressIndicator(
-                            modifier    = Modifier.size(20.dp),
-                            strokeWidth = 2.dp,
-                            color       = MaterialTheme.colorScheme.onError
-                        )
-                        Spacer(Modifier.width(8.dp))
-                        Text("Subiendo...")
-                    }
-                    else -> {
-                        Icon(Icons.Default.Send, null, Modifier.size(18.dp))
-                        Spacer(Modifier.width(8.dp))
-                        Text("Subir advertencia", fontWeight = FontWeight.Bold)
-                    }
+                if (uiState is IncidentUiState.Loading) {
+                    CircularProgressIndicator(
+                        modifier    = Modifier.size(18.dp),
+                        strokeWidth = 2.dp,
+                        color       = MaterialTheme.colorScheme.onError
+                    )
+                    Spacer(Modifier.width(10.dp))
+                    Text("Enviando...", fontWeight = FontWeight.Bold)
+                } else {
+                    Icon(Icons.Default.Send, null, Modifier.size(18.dp))
+                    Spacer(Modifier.width(8.dp))
+                    Text("Subir advertencia", fontWeight = FontWeight.Bold)
                 }
             }
 
-            // Botón secundario: cancelar
-            OutlinedButton(
-                onClick   = {
-                    viewModel.resetState()
-                    onDismiss()
-                },
-                modifier  = Modifier.fillMaxWidth(),
-                enabled   = uiState !is IncidentUiState.Loading
-            ) {
-                Text("Cancelar")
-            }
+            Spacer(Modifier.height(8.dp))
         }
-    }
-}
-
-/**
- * Canvas interactivo que simula el selector de punto en el mapa.
- *
- * - Muestra una cuadrícula simplificada con los límites de Xalapa.
- * - Al tocar, convierte las coordenadas del canvas en lat/lng y
- *   llama a [onTap] para que el ViewModel valide y actualice el estado.
- * - Si el punto está dentro del área válida se pinta en verde;
- *   fuera del área se pinta en rojo (FA-01).
- */
-@Composable
-private fun MapPickerCanvas(
-    tapOffset     : Offset?,
-    pointSelected : Boolean,
-    uiState       : IncidentUiState,
-    onTap         : (offset: Offset, lat: Double, lng: Double) -> Unit
-) {
-    val primaryColor = MaterialTheme.colorScheme.primary
-    val errorColor   = MaterialTheme.colorScheme.error
-    val surfaceColor = MaterialTheme.colorScheme.surfaceVariant
-    val outlineColor = MaterialTheme.colorScheme.outline
-
-    // Color del pin dependiendo del estado FA-01
-    val isInvalidPoint = uiState is IncidentUiState.Error &&
-        (uiState as IncidentUiState.Error).message.contains("inválido", ignoreCase = true)
-    val pinColor = if (isInvalidPoint) errorColor else primaryColor
-
-    Box(
-        modifier = Modifier
-            .fillMaxWidth()
-            .height(220.dp)
-    ) {
-        Canvas(
-            modifier = Modifier
-                .fillMaxSize()
-                .background(surfaceColor, shape = MaterialTheme.shapes.medium)
-                .pointerInput(Unit) {
-                    detectTapGestures { offset ->
-                        // Convertir posición canvas → lat/lng dentro del bounding-box
-                        val lat = LAT_MAX - (offset.y / size.height) * (LAT_MAX - LAT_MIN)
-                        val lng = LNG_MIN + (offset.x / size.width)  * (LNG_MAX - LNG_MIN)
-                        onTap(offset, lat, lng)
-                    }
-                }
-        ) {
-            val w = size.width
-            val h = size.height
-
-            // Cuadrícula de fondo
-            val gridLines = 5
-            val gridColor = Color(0x22000000)
-            for (i in 0..gridLines) {
-                val x = w * i / gridLines
-                val y = h * i / gridLines
-                drawLine(gridColor, Offset(x, 0f), Offset(x, h), strokeWidth = 1f)
-                drawLine(gridColor, Offset(0f, y), Offset(w, y),  strokeWidth = 1f)
-            }
-
-            // Cruz central (centro de Xalapa)
-            val cx = w * 0.5f
-            val cy = h * 0.5f
-            drawLine(outlineColor, Offset(cx - 12f, cy), Offset(cx + 12f, cy), strokeWidth = 2f)
-            drawLine(outlineColor, Offset(cx, cy - 12f), Offset(cx, cy + 12f), strokeWidth = 2f)
-
-            // Pin del punto seleccionado
-            if (tapOffset != null && pointSelected) {
-                drawCircle(pinColor.copy(alpha = 0.25f), radius = 22f, center = tapOffset)
-                drawCircle(pinColor, radius = 10f, center = tapOffset)
-                drawCircle(Color.White, radius = 4f, center = tapOffset)
-            }
-        }
-
-        // Etiqueta de instrucción cuando no hay punto
-        if (!pointSelected) {
-            Text(
-                "Toca aquí para marcar la ubicación",
-                modifier = Modifier.align(Alignment.Center),
-                style    = MaterialTheme.typography.labelMedium,
-                color    = outlineColor,
-                textAlign = TextAlign.Center
-            )
-        }
-
-        // Etiqueta de referencia (esquina inferior)
-        Text(
-            "Área: Xalapa, Ver.",
-            modifier = Modifier
-                .align(Alignment.BottomEnd)
-                .padding(6.dp),
-            style    = MaterialTheme.typography.labelSmall,
-            color    = outlineColor
-        )
     }
 }
