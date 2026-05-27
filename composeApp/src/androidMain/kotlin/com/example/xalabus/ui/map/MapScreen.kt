@@ -90,13 +90,42 @@ actual fun MapScreen(
             mapLibreMap = map
             map.moveCamera(CameraUpdateFactory.newLatLngZoom(xalapaCenter, 13.0))
 
-            val path = mapPath
-            if (path == null) return@getMapAsync
-
             val styleFileName = if (isDarkMode) "style_dark.json" else "style.json"
-            val styleJson = context.assets.open(styleFileName).bufferedReader().use { it.readText() }
-            val mapDir = File(path).parent ?: ""
-            val finalStyle = styleJson.replace("{mbtiles_path}", mapDir)
+            val styleJson = try {
+                context.assets.open(styleFileName).bufferedReader().use { it.readText() }
+            } catch (e: Exception) {
+                ""
+            }
+
+            val mbtilesDir = if (mapPath != null) {
+                File(mapPath!!).parent
+            } else {
+                val defaultFile = File(context.filesDir, "xalapa.mbtiles")
+                if (defaultFile.exists()) context.filesDir.absolutePath else null
+            }
+
+            val finalStyle = if (styleJson.isNotEmpty() && mbtilesDir != null) {
+                styleJson.replace("{mbtiles_path}", mbtilesDir)
+            } else {
+                """
+                {
+                  "version": 8,
+                  "sources": {
+                    "osm": {
+                      "type": "raster",
+                      "tiles": ["https://tile.openstreetmap.org/{z}/{x}/{y}.png"],
+                      "tileSize": 256,
+                      "attribution": "© OpenStreetMap contributors"
+                    }
+                  },
+                  "layers": [{
+                    "id": "osm-layer",
+                    "type": "raster",
+                    "source": "osm"
+                  }]
+                }
+                """.trimIndent()
+            }
 
             loadedStyle = null
             map.setStyle(Style.Builder().fromJson(finalStyle)) { style ->
@@ -113,23 +142,34 @@ actual fun MapScreen(
 
     // ── Efecto 2: Re-aplicar estilo si cambia isDarkMode o mapPath ───────────
     LaunchedEffect(mapPath, isDarkMode) {
-        val map  = mapLibreMap ?: return@LaunchedEffect
-        val path = mapPath     ?: return@LaunchedEffect
+        val map = mapLibreMap ?: return@LaunchedEffect
 
         val styleFileName = if (isDarkMode) "style_dark.json" else "style.json"
-        val styleJson = context.assets.open(styleFileName).bufferedReader().use { it.readText() }
-        val mapDir = File(path).parent ?: ""
-        val finalStyle = styleJson.replace("{mbtiles_path}", mapDir)
+        val styleJson = try {
+            context.assets.open(styleFileName).bufferedReader().use { it.readText() }
+        } catch (e: Exception) {
+            ""
+        }
 
-        loadedStyle = null
-        map.setStyle(Style.Builder().fromJson(finalStyle)) { style ->
-            if (ContextCompat.checkSelfPermission(
-                    context, Manifest.permission.ACCESS_FINE_LOCATION
-                ) == PackageManager.PERMISSION_GRANTED
-            ) {
-                enableLocation(map, style, context, onUserLocationChanged)
+        val mbtilesDir = if (mapPath != null) {
+            File(mapPath!!).parent
+        } else {
+            val defaultFile = File(context.filesDir, "xalapa.mbtiles")
+            if (defaultFile.exists()) context.filesDir.absolutePath else null
+        }
+
+        if (styleJson.isNotEmpty() && mbtilesDir != null) {
+            val finalStyle = styleJson.replace("{mbtiles_path}", mbtilesDir)
+            loadedStyle = null
+            map.setStyle(Style.Builder().fromJson(finalStyle)) { style ->
+                if (ContextCompat.checkSelfPermission(
+                        context, Manifest.permission.ACCESS_FINE_LOCATION
+                    ) == PackageManager.PERMISSION_GRANTED
+                ) {
+                    enableLocation(map, style, context, onUserLocationChanged)
+                }
+                loadedStyle = style
             }
-            loadedStyle = style
         }
     }
 

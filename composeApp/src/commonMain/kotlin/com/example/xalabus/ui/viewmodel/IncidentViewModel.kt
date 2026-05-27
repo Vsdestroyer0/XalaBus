@@ -80,10 +80,11 @@ class IncidentViewModel : ViewModel() {
             try {
                 val payload = buildMap<String, Any?> {
                     userId?.let { put("user_id", it) }
+                    put("tipo",        "otro") // Campo obligatorio según esquema
                     put("latitud",     latitud)
                     put("longitud",    longitud)
                     put("descripcion", descripcion)
-                    put("estado",      "pendiente")
+                    put("estado",      "activo") // Estado válido según el CHECK del esquema
                 }
                 supabase.postgrest
                     .from("reportes")

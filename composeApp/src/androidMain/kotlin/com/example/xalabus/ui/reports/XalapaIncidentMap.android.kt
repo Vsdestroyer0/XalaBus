@@ -7,8 +7,9 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.viewinterop.AndroidView
 import com.example.xalabus.ui.map.rememberMapViewWithLifecycle
 import com.example.xalabus.ui.viewmodel.IncidentViewModel
-import com.mapbox.geojson.Feature
-import com.mapbox.geojson.Point
+import org.maplibre.geojson.Feature
+import org.maplibre.geojson.FeatureCollection
+import org.maplibre.geojson.Point
 import org.maplibre.android.camera.CameraUpdateFactory
 import org.maplibre.android.geometry.LatLng
 import org.maplibre.android.maps.MapLibreMap
@@ -53,6 +54,19 @@ actual fun XalapaIncidentMap(
             val styleJson = try {
                 context.assets.open(styleFileName).bufferedReader().use { it.readText() }
             } catch (e: Exception) {
+                ""
+            }
+
+            val mbtilesDir = if (mapStylePath != null) {
+                java.io.File(mapStylePath).parent
+            } else {
+                val defaultFile = java.io.File(context.filesDir, "xalapa.mbtiles")
+                if (defaultFile.exists()) context.filesDir.absolutePath else null
+            }
+
+            val finalStyle = if (styleJson.isNotEmpty() && mbtilesDir != null) {
+                styleJson.replace("{mbtiles_path}", mbtilesDir)
+            } else {
                 // Fallback a OpenStreetMap tiles (no requiere API key)
                 """
                 {
@@ -72,13 +86,6 @@ actual fun XalapaIncidentMap(
                   }]
                 }
                 """.trimIndent()
-            }
-
-            val finalStyle = if (mapStylePath != null) {
-                val mapDir = java.io.File(mapStylePath).parent ?: ""
-                styleJson.replace("{mbtiles_path}", mapDir)
-            } else {
-                styleJson
             }
 
             map.setStyle(Style.Builder().fromJson(finalStyle)) { style ->
@@ -120,6 +127,6 @@ actual fun XalapaIncidentMap(
 
 private fun updateMarker(style: Style, lat: Double, lng: Double) {
     val source = style.getSourceAs<GeoJsonSource>(MARKER_SOURCE) ?: return
-    val featureJson = Feature.fromGeometry(Point.fromLngLat(lng, lat)).toJson()
-    source.setGeoJson(featureJson)
+    val feature = Feature.fromGeometry(Point.fromLngLat(lng, lat))
+    source.setGeoJson(FeatureCollection.fromFeature(feature))
 }
