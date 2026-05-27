@@ -1,19 +1,15 @@
 package com.example.xalabus.ui.reports
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.AttachFile
 import androidx.compose.material.icons.filled.CheckCircle
-import androidx.compose.material.icons.filled.MyLocation
 import androidx.compose.material.icons.filled.Place
 import androidx.compose.material.icons.filled.ReportProblem
 import androidx.compose.material.icons.filled.Send
@@ -22,7 +18,6 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
@@ -30,7 +25,6 @@ import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import com.example.xalabus.ui.viewmodel.IncidentUiState
 import com.example.xalabus.ui.viewmodel.IncidentViewModel
 
@@ -56,32 +50,36 @@ fun ReportIncidentScreen(
     viewModel: IncidentViewModel,
     onDismiss: () -> Unit
 ) {
-    val uiState    by viewModel.uiState.collectAsState()
+    val uiState     by viewModel.uiState.collectAsState()
     val selectedLat by viewModel.selectedLat.collectAsState()
     val selectedLng by viewModel.selectedLng.collectAsState()
 
     var descripcion by remember { mutableStateOf("") }
     var mapSize     by remember { mutableStateOf(IntSize.Zero) }
 
-    // Límites del mapa de Xalapa (deben coincidir con IncidentViewModel.Companion)
+    // Límites del mapa de Xalapa (coinciden con IncidentViewModel.Companion)
     val LAT_MIN = 19.48; val LAT_MAX = 19.60
     val LNG_MIN = -97.00; val LNG_MAX = -96.85
 
-    // Convierte coordenadas geo → fracción [0,1] dentro del mapa
-    fun latToFraction(lat: Double) = ((LAT_MAX - lat) / (LAT_MAX - LAT_MIN)).coerceIn(0.0, 1.0)
-    fun lngToFraction(lng: Double) = ((lng - LNG_MIN) / (LNG_MAX - LNG_MIN)).coerceIn(0.0, 1.0)
-
-    // Convierte fracción [0,1] → coordenada geo
-    fun fractionToLat(f: Float) = LAT_MAX - f * (LAT_MAX - LAT_MIN)
-    fun fractionToLng(f: Float) = LNG_MIN + f * (LNG_MAX - LNG_MIN)
+    fun latToFraction(lat: Double) = ((LAT_MAX - lat)  / (LAT_MAX - LAT_MIN)).coerceIn(0.0, 1.0)
+    fun lngToFraction(lng: Double) = ((lng   - LNG_MIN) / (LNG_MAX - LNG_MIN)).coerceIn(0.0, 1.0)
+    fun fractionToLat(f: Float)    = LAT_MAX - f * (LAT_MAX - LAT_MIN)
+    fun fractionToLng(f: Float)    = LNG_MIN + f * (LNG_MAX - LNG_MIN)
 
     val markerFracX = lngToFraction(selectedLng).toFloat()
     val markerFracY = latToFraction(selectedLat).toFloat()
 
     val isDescriptionEmpty = descripcion.isBlank()
-    val isPointValid = IncidentViewModel.isWithinXalapa(selectedLat, selectedLng)
+    val isPointValid       = IncidentViewModel.isWithinXalapa(selectedLat, selectedLng)
 
-    // Navegar de vuelta al completar exitosamente
+    // Colores del mapa derivados del tema — resueltos fuera del Canvas
+    val mapBgColor   = if (isPointValid)
+        MaterialTheme.colorScheme.tertiaryContainer
+    else
+        MaterialTheme.colorScheme.errorContainer
+    val gridColor    = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.25f)
+    val labelColor   = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.55f)
+
     LaunchedEffect(uiState) {
         if (uiState is IncidentUiState.Success) {
             viewModel.resetState()
@@ -127,7 +125,7 @@ fun ReportIncidentScreen(
                 Column {
                     Text(
                         "¿Qué está pasando?",
-                        style = MaterialTheme.typography.titleLarge,
+                        style      = MaterialTheme.typography.titleLarge,
                         fontWeight = FontWeight.Bold
                     )
                     Text(
@@ -141,126 +139,96 @@ fun ReportIncidentScreen(
             // ── Paso 1: Seleccionar punto en el mapa ──────────────────────────
             Text(
                 "1. Toca el mapa para marcar la ubicación",
-                style = MaterialTheme.typography.labelLarge,
+                style      = MaterialTheme.typography.labelLarge,
                 fontWeight = FontWeight.SemiBold,
-                color = MaterialTheme.colorScheme.primary
+                color      = MaterialTheme.colorScheme.primary
             )
 
-            // Mapa interactivo simplificado (cuadrícula con toque)
             Card(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(220.dp),
-                shape = RoundedCornerShape(12.dp),
+                modifier  = Modifier.fillMaxWidth().height(220.dp),
+                shape     = RoundedCornerShape(12.dp),
                 elevation = CardDefaults.cardElevation(defaultElevation = 3.dp)
             ) {
                 Box(
                     modifier = Modifier
                         .fillMaxSize()
-                        .background(
-                            if (isPointValid)
-                                MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.25f)
-                            else
-                                MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.18f)
-                        )
+                        // Fondo sólido visible — corrige el mapa negro
+                        .background(mapBgColor)
                         .onSizeChanged { mapSize = it }
                         .pointerInput(Unit) {
                             detectTapGestures { offset ->
                                 if (mapSize.width > 0 && mapSize.height > 0) {
-                                    val fracX = offset.x / mapSize.width
-                                    val fracY = offset.y / mapSize.height
                                     viewModel.updateLocation(
-                                        fractionToLat(fracY),
-                                        fractionToLng(fracX)
+                                        fractionToLat(offset.y / mapSize.height),
+                                        fractionToLng(offset.x / mapSize.width)
                                     )
                                 }
                             }
                         }
                 ) {
-                    // Cuadrícula decorativa
-                    val gridColor = MaterialTheme.colorScheme.outline.copy(alpha = 0.15f)
-                    androidx.compose.foundation.Canvas(
-                        modifier = Modifier.fillMaxSize()
-                    ) {
+                    // Cuadrícula con opacidad visible
+                    androidx.compose.foundation.Canvas(Modifier.fillMaxSize()) {
                         val cols = 6; val rows = 5
                         for (i in 1 until cols) {
                             val x = size.width * i / cols
-                            drawLine(gridColor, Offset(x, 0f), Offset(x, size.height), strokeWidth = 1f)
+                            drawLine(gridColor, Offset(x, 0f), Offset(x, size.height), strokeWidth = 1.5f)
                         }
                         for (j in 1 until rows) {
                             val y = size.height * j / rows
-                            drawLine(gridColor, Offset(0f, y), Offset(size.width, y), strokeWidth = 1f)
+                            drawLine(gridColor, Offset(0f, y), Offset(size.width, y), strokeWidth = 1.5f)
                         }
                     }
 
-                    // Etiquetas de referencia
+                    // Etiqueta Norte
                     Text(
-                        "N",
-                        modifier = Modifier.align(Alignment.TopCenter).padding(4.dp),
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                        "▲ Norte",
+                        modifier = Modifier.align(Alignment.TopCenter).padding(top = 6.dp),
+                        style    = MaterialTheme.typography.labelSmall,
+                        color    = labelColor
                     )
+
+                    // Etiqueta central de referencia
                     Text(
-                        "Centro",
+                        "Xalapa · toca para marcar",
                         modifier = Modifier.align(Alignment.Center),
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
+                        style    = MaterialTheme.typography.labelSmall,
+                        color    = labelColor
                     )
 
                     // Marcador del punto seleccionado
                     if (mapSize.width > 0) {
-                        val px = (markerFracX * mapSize.width).dp
-                        val py = (markerFracY * mapSize.height).dp
                         Box(
-                            modifier = Modifier
-                                .offset(
-                                    x = (markerFracX * mapSize.width - 12).dp,
-                                    y = (markerFracY * mapSize.height - 24).dp
-                                )
+                            modifier = Modifier.offset(
+                                x = (markerFracX * mapSize.width  - 12).dp,
+                                y = (markerFracY * mapSize.height - 24).dp
+                            )
                         ) {
                             Icon(
                                 Icons.Default.Place,
                                 contentDescription = "Ubicación seleccionada",
                                 modifier = Modifier.size(28.dp),
-                                tint = if (isPointValid)
-                                    MaterialTheme.colorScheme.error
+                                tint     = if (isPointValid)
+                                    Color(0xFFCC0000)
                                 else
-                                    MaterialTheme.colorScheme.errorContainer
+                                    MaterialTheme.colorScheme.error
                             )
                         }
                     }
-
-                    // Instrucción dentro del mapa
-                    Text(
-                        "Toca para marcar",
-                        modifier = Modifier
-                            .align(Alignment.BottomCenter)
-                            .padding(bottom = 6.dp)
-                            .background(
-                                MaterialTheme.colorScheme.surface.copy(alpha = 0.75f),
-                                RoundedCornerShape(4.dp)
-                            )
-                            .padding(horizontal = 8.dp, vertical = 2.dp),
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurface
-                    )
                 }
             }
 
-            // Chip con coordenadas seleccionadas + validación FA-01
+            // Chip estado del punto
             Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically,
+                modifier              = Modifier.fillMaxWidth(),
+                verticalAlignment     = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 Icon(
                     if (isPointValid) Icons.Default.CheckCircle else Icons.Default.Warning,
                     contentDescription = null,
-                    modifier = Modifier.size(18.dp),
-                    tint = if (isPointValid)
-                        MaterialTheme.colorScheme.primary
-                    else
-                        MaterialTheme.colorScheme.error
+                    modifier           = Modifier.size(18.dp),
+                    tint               = if (isPointValid) MaterialTheme.colorScheme.primary
+                                         else MaterialTheme.colorScheme.error
                 )
                 Text(
                     if (isPointValid)
@@ -268,10 +236,8 @@ fun ReportIncidentScreen(
                     else
                         "Punto inválido — selecciona dentro de Xalapa",
                     style = MaterialTheme.typography.labelMedium,
-                    color = if (isPointValid)
-                        MaterialTheme.colorScheme.onSurfaceVariant
-                    else
-                        MaterialTheme.colorScheme.error
+                    color = if (isPointValid) MaterialTheme.colorScheme.onSurfaceVariant
+                             else MaterialTheme.colorScheme.error
                 )
             }
 
@@ -280,19 +246,19 @@ fun ReportIncidentScreen(
             // ── Paso 2: Descripción ───────────────────────────────────────────
             Text(
                 "2. Describe el problema",
-                style = MaterialTheme.typography.labelLarge,
+                style      = MaterialTheme.typography.labelLarge,
                 fontWeight = FontWeight.SemiBold,
-                color = MaterialTheme.colorScheme.primary
+                color      = MaterialTheme.colorScheme.primary
             )
 
             OutlinedTextField(
-                value         = descripcion,
-                onValueChange = { descripcion = it },
-                label         = { Text("Descripción de la advertencia *") },
-                placeholder   = { Text("ej. Bloqueo de vía, desvío de ruta, tráfico intenso...") },
-                modifier      = Modifier.fillMaxWidth().height(130.dp),
-                maxLines      = 5,
-                isError       = isDescriptionEmpty && uiState is IncidentUiState.Error,
+                value          = descripcion,
+                onValueChange  = { descripcion = it },
+                label          = { Text("Descripción de la advertencia *") },
+                placeholder    = { Text("ej. Bloqueo de vía, desvío de ruta, tráfico intenso...") },
+                modifier       = Modifier.fillMaxWidth().height(130.dp),
+                maxLines       = 5,
+                isError        = isDescriptionEmpty && uiState is IncidentUiState.Error,
                 supportingText = {
                     if (isDescriptionEmpty) {
                         Text(
@@ -304,18 +270,13 @@ fun ReportIncidentScreen(
                 }
             )
 
-            // ── Paso 3: Foto (opcional) ───────────────────────────────────────
-            // C1: la foto es opcional según la tabla de pruebas
+            // ── Paso 3: Foto opcional (C1) ────────────────────────────────────
             OutlinedButton(
                 onClick  = { /* extensión futura: Supabase Storage */ },
                 modifier = Modifier.fillMaxWidth(),
-                enabled  = false  // placeholder hasta implementar Storage
+                enabled  = false
             ) {
-                Icon(
-                    Icons.Default.AttachFile,
-                    contentDescription = null,
-                    modifier = Modifier.size(18.dp)
-                )
+                Icon(Icons.Default.AttachFile, null, Modifier.size(18.dp))
                 Spacer(Modifier.width(8.dp))
                 Text("Adjuntar foto (opcional) — próximamente")
             }
@@ -329,14 +290,14 @@ fun ReportIncidentScreen(
                     shape = RoundedCornerShape(8.dp)
                 ) {
                     Row(
-                        modifier = Modifier.padding(12.dp),
-                        verticalAlignment = Alignment.CenterVertically,
+                        modifier              = Modifier.padding(12.dp),
+                        verticalAlignment     = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
                         Icon(
                             Icons.Default.Warning,
                             contentDescription = null,
-                            tint = MaterialTheme.colorScheme.onErrorContainer,
+                            tint     = MaterialTheme.colorScheme.onErrorContainer,
                             modifier = Modifier.size(18.dp)
                         )
                         Text(
@@ -351,17 +312,15 @@ fun ReportIncidentScreen(
             Spacer(Modifier.height(4.dp))
 
             // ── Botón enviar ──────────────────────────────────────────────────
-            // C3: deshabilitado si descripción vacía
-            // C2: deshabilitado si punto inválido
             Button(
                 onClick  = { viewModel.submitIncidente(descripcion) },
                 modifier = Modifier.fillMaxWidth().height(52.dp),
                 enabled  = !isDescriptionEmpty && isPointValid && uiState !is IncidentUiState.Loading,
                 colors   = ButtonDefaults.buttonColors(
-                    containerColor = MaterialTheme.colorScheme.error,
-                    contentColor   = MaterialTheme.colorScheme.onError,
+                    containerColor         = MaterialTheme.colorScheme.error,
+                    contentColor           = MaterialTheme.colorScheme.onError,
                     disabledContainerColor = MaterialTheme.colorScheme.surfaceVariant,
-                    disabledContentColor = MaterialTheme.colorScheme.onSurfaceVariant
+                    disabledContentColor   = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             ) {
                 if (uiState is IncidentUiState.Loading) {
