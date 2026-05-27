@@ -23,6 +23,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import com.example.xalabus.ui.viewmodel.IncidentUiState
@@ -72,13 +73,11 @@ fun ReportIncidentScreen(
     val isDescriptionEmpty = descripcion.isBlank()
     val isPointValid       = IncidentViewModel.isWithinXalapa(selectedLat, selectedLng)
 
-    // Colores del mapa derivados del tema — resueltos fuera del Canvas
-    val mapBgColor   = if (isPointValid)
-        MaterialTheme.colorScheme.tertiaryContainer
-    else
-        MaterialTheme.colorScheme.errorContainer
-    val gridColor    = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.25f)
-    val labelColor   = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.55f)
+    // Colores cartográficos fijos — independientes del tema de la app
+    // Verde oscuro para zona válida, rojo oscuro para zona inválida
+    val mapBgColor  = if (isPointValid) Color(0xFF2D6A4F) else Color(0xFF8B2020)
+    val gridColor   = Color.White.copy(alpha = 0.20f)
+    val labelColor  = Color.White.copy(alpha = 0.85f)
 
     LaunchedEffect(uiState) {
         if (uiState is IncidentUiState.Success) {
@@ -152,7 +151,7 @@ fun ReportIncidentScreen(
                 Box(
                     modifier = Modifier
                         .fillMaxSize()
-                        // Fondo sólido visible — corrige el mapa negro
+                        // Color cartográfico fijo — no depende del tema Material
                         .background(mapBgColor)
                         .onSizeChanged { mapSize = it }
                         .pointerInput(Unit) {
@@ -166,7 +165,7 @@ fun ReportIncidentScreen(
                             }
                         }
                 ) {
-                    // Cuadrícula con opacidad visible
+                    // Cuadrícula blanca semitransparente
                     androidx.compose.foundation.Canvas(Modifier.fillMaxSize()) {
                         val cols = 6; val rows = 5
                         for (i in 1 until cols) {
@@ -182,7 +181,11 @@ fun ReportIncidentScreen(
                     // Etiqueta Norte
                     Text(
                         "▲ Norte",
-                        modifier = Modifier.align(Alignment.TopCenter).padding(top = 6.dp),
+                        modifier = Modifier
+                            .align(Alignment.TopCenter)
+                            .padding(top = 6.dp)
+                            .background(Color.Black.copy(alpha = 0.25f), RoundedCornerShape(4.dp))
+                            .padding(horizontal = 6.dp, vertical = 2.dp),
                         style    = MaterialTheme.typography.labelSmall,
                         color    = labelColor
                     )
@@ -190,29 +193,27 @@ fun ReportIncidentScreen(
                     // Etiqueta central de referencia
                     Text(
                         "Xalapa · toca para marcar",
-                        modifier = Modifier.align(Alignment.Center),
+                        modifier = Modifier
+                            .align(Alignment.Center)
+                            .background(Color.Black.copy(alpha = 0.25f), RoundedCornerShape(4.dp))
+                            .padding(horizontal = 6.dp, vertical = 2.dp),
                         style    = MaterialTheme.typography.labelSmall,
                         color    = labelColor
                     )
 
-                    // Marcador del punto seleccionado
-                    if (mapSize.width > 0) {
-                        Box(
-                            modifier = Modifier.offset(
-                                x = (markerFracX * mapSize.width  - 12).dp,
-                                y = (markerFracY * mapSize.height - 24).dp
-                            )
-                        ) {
-                            Icon(
-                                Icons.Default.Place,
-                                contentDescription = "Ubicación seleccionada",
-                                modifier = Modifier.size(28.dp),
-                                tint     = if (isPointValid)
-                                    Color(0xFFCC0000)
-                                else
-                                    MaterialTheme.colorScheme.error
-                            )
-                        }
+                    // Marcador: posicionado en píxeles exactos con absoluteOffset
+                    if (mapSize.width > 0 && mapSize.height > 0) {
+                        val iconSizePx = 28
+                        val markerX = (markerFracX * mapSize.width  - iconSizePx / 2).toInt()
+                        val markerY = (markerFracY * mapSize.height - iconSizePx).toInt()
+                        Icon(
+                            Icons.Default.Place,
+                            contentDescription = "Ubicación seleccionada",
+                            modifier = Modifier
+                                .size(iconSizePx.dp)
+                                .absoluteOffset { IntOffset(markerX, markerY) },
+                            tint = Color.White
+                        )
                     }
                 }
             }
