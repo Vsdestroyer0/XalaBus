@@ -27,14 +27,18 @@ class IncidentViewModel : ViewModel() {
     private val _uiState = MutableStateFlow<IncidentUiState>(IncidentUiState.Idle)
     val uiState: StateFlow<IncidentUiState> = _uiState.asStateFlow()
 
-    // Coordenadas iniciales: centro de Xalapa
+    // Coordenadas del punto seleccionado en el mapa de reporte
     private val _selectedLat = MutableStateFlow(19.5438)
     val selectedLat: StateFlow<Double> = _selectedLat.asStateFlow()
 
     private val _selectedLng = MutableStateFlow(-96.9269)
     val selectedLng: StateFlow<Double> = _selectedLng.asStateFlow()
 
-    // Límites geográficos aproximados del municipio de Xalapa
+    // CU-13 postcondición: lista de incidentes pendientes visibles en el mapa
+    private val _incidentes = MutableStateFlow<List<Incidente>>(emptyList())
+    val incidentes: StateFlow<List<Incidente>> = _incidentes.asStateFlow()
+
+    // Límites geográficos del municipio de Xalapa
     // FA-01 (C2): coordenadas fuera de estos límites → "Punto inválido"
     companion object {
         private const val LAT_MIN = 19.48
@@ -52,6 +56,21 @@ class IncidentViewModel : ViewModel() {
     }
 
     /**
+     * CU-13 postcondición: carga los incidentes pendientes desde Supabase
+     * para mostrarlos en el mapa principal.
+     */
+    fun cargarIncidentes() {
+        viewModelScope.launch {
+            try {
+                _incidentes.value = repository.getIncidentesPendientes()
+            } catch (e: Exception) {
+                // Si falla la carga, simplemente no se muestran — no bloquea el mapa
+                _incidentes.value = emptyList()
+            }
+        }
+    }
+
+    /**
      * CU-13: Envía un reporte de incidente a Supabase.
      *
      * Validaciones (tabla de casos de prueba):
@@ -63,7 +82,7 @@ class IncidentViewModel : ViewModel() {
         val latitud  = _selectedLat.value
         val longitud = _selectedLng.value
 
-        // FA-01 (C2): validar que el punto esté dentro del mapa de Xalapa
+        // FA-01 (C2): punto fuera de Xalapa
         if (!isWithinXalapa(latitud, longitud)) {
             _uiState.value = IncidentUiState.Error("Punto inválido. Selecciona un punto dentro del mapa de Xalapa.")
             return
@@ -89,8 +108,10 @@ class IncidentViewModel : ViewModel() {
                 )
                 repository.reportarIncidente(incidente)
                 _uiState.value = IncidentUiState.Success
+                // Recargar incidentes para que aparezca el nuevo en el mapa
+                cargarIncidentes()
             } catch (e: Exception) {
-                // Ex-01 (C4): error al cargar/guardar datos
+                // Ex-01 (C4)
                 _uiState.value = IncidentUiState.Error("Error al cargar datos. Intenta de nuevo.")
             }
         }
