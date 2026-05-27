@@ -38,13 +38,11 @@ actual fun XalapaIncidentMap(
     var mapLibreMap  by remember { mutableStateOf<MapLibreMap?>(null) }
     var loadedStyle  by remember { mutableStateOf<Style?>(null) }
 
-    // Carga el mapa y el estilo (igual que MapScreen.android.kt)
     LaunchedEffect(mapStylePath, isDarkMode) {
         mapView.getMapAsync { map ->
             mapLibreMap = map
             map.moveCamera(CameraUpdateFactory.newLatLngZoom(xalapaCenter, 13.0))
 
-            // Registrar listener de taps
             map.addOnMapClickListener { latLng ->
                 viewModel.updateLocation(latLng.latitude, latLng.longitude)
                 true
@@ -54,7 +52,6 @@ actual fun XalapaIncidentMap(
             val styleJson = try {
                 context.assets.open(styleFileName).bufferedReader().use { it.readText() }
             } catch (e: Exception) {
-                // fallback: estilo OpenMapTiles desde CARTO (no requiere assets locales)
                 """
                 {
                   "version": 8,
@@ -84,7 +81,6 @@ actual fun XalapaIncidentMap(
             loadedStyle = null
             map.setStyle(Style.Builder().fromJson(finalStyle)) { style ->
                 loadedStyle = style
-                // Fuente + capa para el marcador del incidente
                 style.addSource(GeoJsonSource(MARKER_SOURCE))
                 style.addLayer(
                     SymbolLayer(MARKER_LAYER, MARKER_SOURCE).apply {
@@ -97,13 +93,11 @@ actual fun XalapaIncidentMap(
                         )
                     }
                 )
-                // Colocar marcador en la posición inicial del ViewModel
                 updateMarker(style, selectedLat, selectedLng)
             }
         }
     }
 
-    // Actualizar marcador cada vez que cambian las coordenadas del ViewModel
     LaunchedEffect(selectedLat, selectedLng, loadedStyle) {
         loadedStyle?.let { style ->
             updateMarker(style, selectedLat, selectedLng)
@@ -118,6 +112,8 @@ actual fun XalapaIncidentMap(
 
 private fun updateMarker(style: Style, lat: Double, lng: Double) {
     val source = style.getSourceAs<GeoJsonSource>(MARKER_SOURCE) ?: return
-    val feature = Feature.fromGeometry(Point.fromLngLat(lng, lat))
-    source.setGeoJson(feature)
+    // Usar .toJson() para pasar String en lugar de Feature directamente,
+    // ya que la versión de MapLibre del proyecto no acepta Feature como argumento
+    val featureJson = Feature.fromGeometry(Point.fromLngLat(lng, lat)).toJson()
+    source.setGeoJson(featureJson)
 }
