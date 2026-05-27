@@ -3,8 +3,9 @@ package com.example.xalabus.ui.viewmodel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.xalabus.data.SupabaseClientProvider
+import com.example.xalabus.data.incidentes.Incidente
+import com.example.xalabus.data.incidentes.IncidentesRepository
 import io.github.jan.supabase.auth.auth
-import io.github.jan.supabase.postgrest.postgrest
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -20,7 +21,8 @@ sealed class IncidentUiState {
 
 class IncidentViewModel : ViewModel() {
 
-    private val supabase = SupabaseClientProvider.client
+    private val supabase   = SupabaseClientProvider.client
+    private val repository = IncidentesRepository()
 
     private val _uiState = MutableStateFlow<IncidentUiState>(IncidentUiState.Idle)
     val uiState: StateFlow<IncidentUiState> = _uiState.asStateFlow()
@@ -78,17 +80,14 @@ class IncidentViewModel : ViewModel() {
         _uiState.value = IncidentUiState.Loading
         viewModelScope.launch {
             try {
-                val payload = buildMap<String, Any?> {
-                    userId?.let { put("user_id", it) }
-                    put("tipo",        "otro") // Campo obligatorio según esquema
-                    put("latitud",     latitud)
-                    put("longitud",    longitud)
-                    put("descripcion", descripcion)
-                    put("estado",      "activo") // Estado válido según el CHECK del esquema
-                }
-                supabase.postgrest
-                    .from("reportes")
-                    .insert(payload)
+                val incidente = Incidente(
+                    userId      = userId,
+                    latitud     = latitud,
+                    longitud    = longitud,
+                    descripcion = descripcion,
+                    estado      = "pendiente"
+                )
+                repository.reportarIncidente(incidente)
                 _uiState.value = IncidentUiState.Success
             } catch (e: Exception) {
                 // Ex-01 (C4): error al cargar/guardar datos
