@@ -129,6 +129,7 @@ fun App(
                     driverFactory    = driverFactory,
                     fileManager      = fileManager,
                     viewModel        = viewModel,
+                    authViewModel    = authViewModel,
                     isDarkMode       = isDarkMode,
                     isAuthenticated  = isAuthenticated,
                     onToggleDarkMode = { isDarkMode = !isDarkMode },
@@ -173,6 +174,7 @@ private fun MainAppContent(
     driverFactory: DriverFactory,
     fileManager: MapFileManager,
     viewModel: RouteViewModel,
+    authViewModel: AuthViewModel,
     isDarkMode: Boolean,
     isAuthenticated: Boolean,
     onToggleDarkMode: () -> Unit,
@@ -419,8 +421,10 @@ private fun MainAppContent(
                 )
             } else {
                 MapDetailView(
+                    driverFactory      = driverFactory,
                     fileManager        = fileManager,
                     viewModel          = viewModel,
+                    authViewModel      = authViewModel,
                     reportsViewModel   = reportsViewModel,
                     favoritosViewModel = favoritosViewModel,
                     routeTimeViewModel = routeTimeViewModel,
@@ -448,6 +452,7 @@ private fun MainAppContent(
             RatingDialog(
                 routeName = ratingRouteName,
                 routeId   = ratingRouteId,
+                userId    = authViewModel.currentUserId(),
                 viewModel = ratingViewModel,
                 onDismiss = {
                     showRatingDialog = false
@@ -462,8 +467,10 @@ private fun MainAppContent(
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalResourceApi::class)
 @Composable
 fun MapDetailView(
+    driverFactory: com.example.xalabus.db.DriverFactory,
     fileManager: MapFileManager,
     viewModel: RouteViewModel,
+    authViewModel: AuthViewModel,
     reportsViewModel: com.example.xalabus.ui.viewmodel.ReportsViewModel,
     favoritosViewModel: FavoritosViewModel,
     routeTimeViewModel: RouteTimeViewModel,
@@ -566,12 +573,12 @@ fun MapDetailView(
 
                 // CU-11: chip de tiempo estimado
                 when (val ts = routeTimeState) {
-                    is RouteTimeUiState.Success -> {
+                    is RouteTimeUiState.Result -> {
                         AssistChip(
                             onClick = {},
                             label = {
                                 Text(
-                                    "~${ts.estimatedMinutes} min",
+                                    "~${ts.totalMinutes} min",
                                     style = MaterialTheme.typography.labelMedium
                                 )
                             },
@@ -604,22 +611,19 @@ fun MapDetailView(
                     }
                     Spacer(Modifier.height(8.dp))
                 }
-
-                MapScreen(
-                    viewModel        = viewModel,
-                    reportsViewModel = reportsViewModel,
-                    isDarkMode       = isDarkMode,
-                    onBack           = onBack,
-                    isAuthenticated  = isAuthenticated
-                )
             }
         }
     ) {
         // contenido principal del scaffold (mapa)
-        com.example.xalabus.ui.map.MapContent(
-            viewModel   = viewModel,
-            isDarkMode  = isDarkMode,
-            fileManager = fileManager
+        MapScreen(
+            fileManager = fileManager,
+            viewModel = viewModel,
+            isDarkMode = isDarkMode,
+            routeTimeViewModel = routeTimeViewModel,
+            incidentViewModel = incidentViewModel,
+            onUserLocationChanged = { lat, lng ->
+                viewModel.updateUserLocation(lat, lng)
+            }
         )
     }
 
@@ -628,6 +632,7 @@ fun MapDetailView(
         RatingDialog(
             routeName = selectedRoute?.name ?: "",
             routeId   = routeId,
+            userId    = authViewModel.currentUserId(),
             viewModel = ratingViewModel,
             onDismiss = { showRatingDialog = false }
         )

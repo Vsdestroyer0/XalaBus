@@ -31,6 +31,11 @@ class AuthViewModel : ViewModel() {
         return supabase.auth.currentSessionOrNull() != null
     }
 
+    /** Devuelve el ID del usuario actual o null si no hay sesión */
+    fun currentUserId(): String? {
+        return supabase.auth.currentUserOrNull()?.id
+    }
+
     /** Inicia sesión con email y contraseña */
     fun signIn(email: String, password: String) {
         if (email.isBlank() || password.isBlank()) {
