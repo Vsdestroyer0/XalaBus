@@ -31,6 +31,7 @@ import com.example.xalabus.ui.auth.ForgotPasswordScreen
 import com.example.xalabus.ui.auth.LoginScreen
 import com.example.xalabus.ui.auth.RegisterScreen
 import com.example.xalabus.ui.home.FavoritosScreen
+import com.example.xalabus.ui.home.HistoryScreen
 import com.example.xalabus.ui.home.HomeScreen
 import com.example.xalabus.ui.map.MapScreen
 import com.example.xalabus.ui.ratings.RatingDialog
@@ -208,6 +209,7 @@ private fun MainAppContent(
     var showGeneralReport by remember { mutableStateOf(false) }
     var showIncidentReport by remember { mutableStateOf(false) }
     var showFavoritos by remember { mutableStateOf(false) }
+    var showHistory by remember { mutableStateOf(false) }
     var showTopRated by remember { mutableStateOf(false) }
     var ratingRouteId   by remember { mutableStateOf("") }
     var ratingRouteName by remember { mutableStateOf("") }
@@ -255,6 +257,16 @@ private fun MainAppContent(
                 showRatingDialog = true
             },
             onDismiss = { showTopRated = false }
+        )
+    } else if (showHistory) {
+        HistoryScreen(
+            routeViewModel     = viewModel,
+            onNavigateToRoute  = { routeId ->
+                viewModel.selectRoute(routeId)
+                showHistory = false
+                showMap = true
+            },
+            onDismiss = { showHistory = false }
         )
     } else {
         ModalNavigationDrawer(
@@ -308,6 +320,21 @@ private fun MainAppContent(
                         onClick  = {
                             scope.launch { drawerState.close() }
                             showTopRated = true
+                        },
+                        colors = NavigationDrawerItemDefaults.colors(
+                            unselectedTextColor = MaterialTheme.colorScheme.primary,
+                            unselectedIconColor = MaterialTheme.colorScheme.primary
+                        ),
+                        modifier = Modifier.padding(NavigationDrawerItemDefaults.ItemPadding)
+                    )
+
+                    NavigationDrawerItem(
+                        icon     = { Icon(Icons.Default.History, contentDescription = null) },
+                        label    = { Text("Historial de Rutas") },
+                        selected = false,
+                        onClick  = {
+                            scope.launch { drawerState.close() }
+                            showHistory = true
                         },
                         colors = NavigationDrawerItemDefaults.colors(
                             unselectedTextColor = MaterialTheme.colorScheme.primary,

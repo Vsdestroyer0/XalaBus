@@ -1,6 +1,7 @@
 package com.example.xalabus.data.repository
 
 import com.example.xalabus.DBD.AppDatabase
+import com.example.xalabus.DBD.RouteEntity
 import com.example.xalabus.DBD.StopEntity
 import com.example.xalabus.data.model.RouteJson
 import com.example.xalabus.data.reports.RouteStop
@@ -71,4 +72,14 @@ class RouteRepository(private val db: AppDatabase) {
         queries.deleteStopsByRoute(routeId)
         stops.filter { it.status == "accepted" && it.id != null }.forEach { insertLocalStop(it) }
     }
+
+    // ── CU- Historial ────────────────────────────────────────────────────────
+
+    fun saveRouteToHistory(routeId: String) {
+        val currentTime = kotlinx.datetime.Clock.System.now().toEpochMilliseconds()
+        queries.insertHistory(routeId, currentTime)
+        queries.deleteOldHistory()
+    }
+
+    fun getRouteHistory(): List<RouteEntity> = queries.selectHistory().executeAsList()
 }
