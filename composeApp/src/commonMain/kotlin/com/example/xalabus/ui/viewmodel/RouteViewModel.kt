@@ -62,6 +62,20 @@ class RouteViewModel(
     private val _searchHistory = MutableStateFlow(com.example.xalabus.core.prefs.SearchHistoryPreferences.getSearchHistory())
     val searchHistory: StateFlow<List<String>> = _searchHistory
 
+    // Historial de Rutas Vistas
+    private val _routeHistory = MutableStateFlow<List<RouteEntity>>(emptyList())
+    val routeHistory: StateFlow<List<RouteEntity>> = _routeHistory.asStateFlow()
+
+    fun loadRouteHistory() {
+        viewModelScope.launch(Dispatchers.IO) {
+            try {
+                _routeHistory.value = repository.getRouteHistory()
+            } catch (e: Exception) {
+                println("Error al cargar historial: ${e.message}")
+            }
+        }
+    }
+
     fun saveSearchQuery(query: String) {
         val trimmed = query.trim()
         if (trimmed.isNotEmpty()) {
@@ -200,6 +214,11 @@ class RouteViewModel(
                 // Solo recuperamos la geometría (el dibujo de la línea en el mapa)
                 _selectedRoutePoints.value = getRoutePoints(routeId)
                 loadLocalStops(routeId)
+
+                // Guardar en el historial en IO thread
+                launch(Dispatchers.IO) {
+                    repository.saveRouteToHistory(routeId)
+                }
 
             } catch (e: Exception) {
                 println("Error al seleccionar ruta $routeId: ${e.message}")

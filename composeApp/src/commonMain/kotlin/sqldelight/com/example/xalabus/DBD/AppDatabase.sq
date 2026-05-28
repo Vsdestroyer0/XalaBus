@@ -59,3 +59,30 @@ SELECT * FROM GeometryEntity WHERE routeId = ?;
 
 getAllRoutes:
 SELECT * FROM RouteEntity;
+
+-- CU- Historial de Rutas
+CREATE TABLE RouteHistoryEntity (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    routeId TEXT NOT NULL UNIQUE,
+    viewedAt INTEGER NOT NULL,
+    FOREIGN KEY (routeId) REFERENCES RouteEntity(id)
+);
+
+insertHistory:
+INSERT OR REPLACE INTO RouteHistoryEntity(routeId, viewedAt)
+VALUES (?, ?);
+
+selectHistory:
+SELECT r.* 
+FROM RouteHistoryEntity h
+JOIN RouteEntity r ON h.routeId = r.id
+ORDER BY h.viewedAt DESC;
+
+deleteOldHistory:
+DELETE FROM RouteHistoryEntity 
+WHERE routeId NOT IN (
+    SELECT routeId 
+    FROM RouteHistoryEntity 
+    ORDER BY viewedAt DESC 
+    LIMIT 15
+);
