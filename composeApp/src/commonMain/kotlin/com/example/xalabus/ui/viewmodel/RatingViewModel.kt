@@ -6,8 +6,6 @@ import com.example.xalabus.core.util.ErrorMapper
 import com.example.xalabus.data.SupabaseClientProvider
 import io.github.jan.supabase.auth.auth
 import io.github.jan.supabase.postgrest.postgrest
-import io.github.jan.supabase.postgrest.query.Columns
-import io.github.jan.supabase.postgrest.query.Order
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -21,6 +19,7 @@ import kotlinx.serialization.Serializable
 data class RouteRating(
     val id: Int? = null,
     @SerialName("route_id")   val routeId: String,
+    @SerialName("route_name") val routeName: String = "",
     @SerialName("user_id")    val userId: String,
     val score: Int,
     val comment: String? = null,
@@ -72,20 +71,22 @@ class RatingViewModel : ViewModel() {
     private val _currentUserScore = MutableStateFlow<Int?>(null)
     val currentUserScore: StateFlow<Int?> = _currentUserScore.asStateFlow()
 
-    /** Carga calificación previa del usuario para la ruta (si existe) */
+    /**
+     * Carga calificación previa del usuario usando la RPC get_user_route_rating.
+     * Evita exponer la tabla directamente y aprovecha SECURITY DEFINER.
+     */
     fun loadUserRating(routeId: String) {
         val userId = supabase.auth.currentSessionOrNull()?.user?.id ?: return
         viewModelScope.launch {
             try {
                 val result = supabase.postgrest
-                    .from("route_ratings")
-                    .select(Columns.ALL) {
-                        filter {
-                            eq("route_id", routeId)
-                            eq("user_id", userId)
-                        }
-                        limit(1)
-                    }
+                    .rpc(
+                        "get_user_route_rating",
+                        mapOf(
+                            "p_route_id" to routeId,
+                            "p_user_id"  to userId
+                        )
+                    )
                     .decodeList<RouteRating>()
                 _currentUserScore.value = result.firstOrNull()?.score
             } catch (_: Exception) {
@@ -95,18 +96,19 @@ class RatingViewModel : ViewModel() {
     }
 
     /**
-     * CU-23 flujo normal: valida rango [1-5], guarda y notifica.
-     * C23-2: score fuera de [1,5] → Error sin guardar.
-     * C23-4: sin sesión activa → Error con aviso de login.
+     * CU-23 flujo normal: valida rango [1-5], hace upsert y notifica.
+     * C23-2: score fuera de [1,5]  → Error sin guardar.
+     * C23-4: sin sesión activa     → Error con aviso de login.
+     * C23-3: error de red          → Error con mensaje para reintentar.
      */
-    fun submitRating(routeId: String, score: Int, comment: String?) {
-        // C23-4: usuario no autenticado
+    fun submitRating(routeId: String, routeName: String, score: Int, comment: String?) {
+        // C23-4
         val userId = supabase.auth.currentSessionOrNull()?.user?.id
         if (userId == null) {
             _ratingState.value = RatingUiState.Error("Debes iniciar sesión para calificar.")
             return
         }
-        // C23-2: puntuación fuera de rango
+        // C23-2
         if (score !in 1..5) {
             _ratingState.value = RatingUiState.Error("Puntuación inválida. Elige entre 1 y 5 estrellas.")
             return
@@ -119,18 +121,21 @@ class RatingViewModel : ViewModel() {
                     .from("route_ratings")
                     .upsert(
                         RouteRating(
-                            routeId = routeId,
-                            userId  = userId,
-                            score   = score,
-                            comment = comment?.takeIf { it.isNotBlank() }
+                            routeId   = routeId,
+                            routeName = routeName,
+                            userId    = userId,
+                            score     = score,
+                            comment   = comment?.takeIf { it.isNotBlank() }
                         )
-                    )
+                    ) {
+                        onConflict = "route_id,user_id"
+                    }
                 _currentUserScore.value = score
                 _ratingState.value = RatingUiState.Success
-                // Refrescar top-rated para que el nuevo promedio se refleje
+                // Refrescar top-rated para reflejar el nuevo promedio
                 refreshTopRated()
             } catch (e: Exception) {
-                // C23-3: error de red
+                // C23-3
                 _ratingState.value = RatingUiState.Error(
                     ErrorMapper.toUserMessage(e, "al guardar calificación")
                 )
@@ -153,7 +158,11 @@ class RatingViewModel : ViewModel() {
     var cityFilter: String? = null
         private set
 
-    /** C24-1 + C24-3: carga inicial o incremental ordenada por promedio desc */
+    /**
+     * C24-1 + C24-3: carga paginada usando la RPC get_top_rated_routes.
+     * La RPC devuelve resultados ya ordenados por avg_score DESC.
+     * C24-5: si falla la conexión, emite TopRatedUiState.Error.
+     */
     fun loadTopRated(refresh: Boolean = false) {
         if (_topRatedState.value is TopRatedUiState.Loading) return
         if (refresh) {
@@ -161,23 +170,23 @@ class RatingViewModel : ViewModel() {
             loadedRoutes.clear()
         }
         _topRatedState.value = TopRatedUiState.Loading
-        val from = (currentPage * PAGE_SIZE).toLong()
-        val to   = (from + PAGE_SIZE - 1)
+        val offset = currentPage * PAGE_SIZE
         viewModelScope.launch {
             try {
                 val newRoutes = supabase.postgrest
-                    .from("route_ratings_summary")
-                    .select(Columns.ALL) {
-                        if (cityFilter != null) filter { eq("city", cityFilter!!) }
-                        order("avg_score", Order.DESCENDING)
-                        range(from, to)
-                    }
+                    .rpc(
+                        "get_top_rated_routes",
+                        mapOf(
+                            "p_limit"  to PAGE_SIZE,
+                            "p_offset" to offset
+                        )
+                    )
                     .decodeList<RouteWithAvgRating>()
 
                 loadedRoutes.addAll(newRoutes)
                 currentPage++
                 _topRatedState.value = if (loadedRoutes.isEmpty()) {
-                    // C24-2: ninguna ruta tiene calificaciones
+                    // C24-2: ninguna ruta tiene calificaciones aún
                     TopRatedUiState.Empty
                 } else {
                     TopRatedUiState.Success(
