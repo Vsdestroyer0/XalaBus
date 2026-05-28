@@ -77,11 +77,11 @@ fun App(
     val reportsViewModel = remember(repository) {
         com.example.xalabus.ui.viewmodel.ReportsViewModel(routeRepository = repository)
     }
-    // CU-03: ViewModel de recuperación de contraseña
+    // CU-03: ViewModel de recuperacion de contrasena
     val forgotPasswordViewModel = remember { ForgotPasswordViewModel() }
     // CU-10: ViewModel de favoritos
     val favoritosViewModel = remember { FavoritosViewModel() }
-    // CU-11: ViewModel de tiempo estimado de traslado (cálculo fijo desde geometría)
+    // CU-11: ViewModel de tiempo estimado de traslado (calculo fijo desde geometria)
     val routeTimeViewModel = remember { RouteTimeViewModel() }
     // CU-13: ViewModel de incidentes GPS
     val incidentViewModel = remember { IncidentViewModel() }
@@ -195,11 +195,11 @@ private fun MainAppContent(
     var showGeneralReport by remember { mutableStateOf(false) }
     // CU-13: controla la pantalla de reporte de incidente con GPS
     var showIncidentReport by remember { mutableStateOf(false) }
-    // CU-10 (extensión): controla la pantalla de rutas favoritas del drawer
+    // CU-10 (extension): controla la pantalla de rutas favoritas del drawer
     var showFavoritos by remember { mutableStateOf(false) }
     // CU-24: controla la pantalla de rutas mejor calificadas
     var showTopRated by remember { mutableStateOf(false) }
-    // CU-23: controla el diálogo de calificar ruta (activado desde TopRated o MapDetail)
+    // CU-23: controla el dialogo de calificar ruta (activado desde TopRated o MapDetail)
     var ratingRouteId   by remember { mutableStateOf("") }
     var ratingRouteName by remember { mutableStateOf("") }
     var showRatingDialog by remember { mutableStateOf(false) }
@@ -223,7 +223,7 @@ private fun MainAppContent(
             onDismiss = { showIncidentReport = false }
         )
     } else if (showFavoritos) {
-        // CU-10 (extensión): pantalla completa de rutas favoritas del usuario
+        // CU-10 (extension): pantalla completa de rutas favoritas del usuario
         FavoritosScreen(
             favoritosViewModel = favoritosViewModel,
             routeViewModel     = viewModel,
@@ -235,7 +235,7 @@ private fun MainAppContent(
             onDismiss = { showFavoritos = false }
         )
     } else if (showTopRated) {
-        // CU-24: pantalla de rutas mejor calificadas (acceso público)
+        // CU-24: pantalla de rutas mejor calificadas (acceso publico)
         TopRatedRoutesScreen(
             viewModel    = ratingViewModel,
             onRouteClick = { routeId ->
@@ -244,7 +244,7 @@ private fun MainAppContent(
                 showMap = true
             },
             onRateRoute  = { routeId, routeName ->
-                // CU-23: el botón calificar de la tarjeta abre el diálogo
+                // CU-23: el boton calificar de la tarjeta abre el dialogo
                 ratingRouteId   = routeId
                 ratingRouteName = routeName
                 showRatingDialog = true
@@ -319,7 +319,7 @@ private fun MainAppContent(
 
                     if (isAuthenticated) {
 
-                        // CU-10 (extensión): ver rutas favoritas guardadas
+                        // CU-10 (extension): ver rutas favoritas guardadas
                         NavigationDrawerItem(
                             icon     = { Icon(Icons.Default.Favorite, contentDescription = null) },
                             label    = { Text("Mis Rutas Favoritas") },
@@ -335,7 +335,7 @@ private fun MainAppContent(
                             modifier = Modifier.padding(NavigationDrawerItemDefaults.ItemPadding)
                         )
 
-                        // CU-13: opción de reportar incidente con GPS
+                        // CU-13: opcion de reportar incidente con GPS
                         NavigationDrawerItem(
                             icon   = { Icon(Icons.Default.ReportProblem, contentDescription = null) },
                             label  = { Text("Reportar Incidente") },
@@ -359,10 +359,10 @@ private fun MainAppContent(
                         )
                     }
 
-                    // CU-09: panel de administración para revisar paradas
+                    // CU-09: panel de administracion para revisar paradas
                     NavigationDrawerItem(
                         icon   = { Icon(Icons.Default.AdminPanelSettings, contentDescription = null) },
-                        label  = { Text("Administración") },
+                        label  = { Text("Administracion") },
                         selected = false,
                         onClick  = {
                             scope.launch { drawerState.close() }
@@ -379,7 +379,7 @@ private fun MainAppContent(
                     if (isAuthenticated) {
                         NavigationDrawerItem(
                             icon   = { Icon(Icons.Default.Logout, contentDescription = null) },
-                            label  = { Text("Cerrar sesión") },
+                            label  = { Text("Cerrar sesion") },
                             selected = false,
                             onClick  = {
                                 scope.launch { drawerState.close() }
@@ -394,7 +394,7 @@ private fun MainAppContent(
                     } else {
                         NavigationDrawerItem(
                             icon   = { Icon(Icons.Default.Login, contentDescription = null) },
-                            label  = { Text("Iniciar sesión") },
+                            label  = { Text("Iniciar sesion") },
                             selected = false,
                             onClick  = {
                                 scope.launch { drawerState.close() }
@@ -447,7 +447,7 @@ private fun MainAppContent(
             )
         }
 
-        // CU-23: diálogo de calificar ruta (puede abrirse desde TopRated o MapDetail)
+        // CU-23: dialogo de calificar ruta (puede abrirse desde TopRated o MapDetail)
         if (showRatingDialog && ratingRouteId.isNotEmpty()) {
             RatingDialog(
                 routeName = ratingRouteName,
@@ -497,7 +497,7 @@ fun MapDetailView(
     // CU-11: estado del estimador de tiempo de traslado
     val routeTimeState by routeTimeViewModel.uiState.collectAsState()
 
-    // CU-23: controla la visibilidad del diálogo de calificación desde MapDetail
+    // CU-23: controla la visibilidad del dialogo de calificacion desde MapDetail
     var showRatingDialog by remember { mutableStateOf(false) }
 
     // Cargar estado de favorito al seleccionar ruta
@@ -507,7 +507,7 @@ fun MapDetailView(
         }
     }
 
-    // CU-11: calcular duración en cuanto llegan los puntos de la ruta
+    // CU-11: calcular duracion en cuanto llegan los puntos de la ruta
     LaunchedEffect(routePoints) {
         if (routePoints.isNotEmpty()) {
             routeTimeViewModel.calculateFromGeometry(routePoints)
@@ -534,7 +534,7 @@ fun MapDetailView(
                     .fillMaxWidth()
                     .padding(horizontal = 20.dp, vertical = 10.dp)
             ) {
-                // ── Encabezado con nombre de ruta y botón de favorito (CU-10) ──
+                // ── Encabezado con nombre de ruta y boton de favorito (CU-10) ──
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
@@ -547,9 +547,13 @@ fun MapDetailView(
                             fontWeight  = FontWeight.Bold,
                             color       = MaterialTheme.colorScheme.onSurface
                         )
+                        Text(
+                            "Xalapa, Veracruz",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
                     }
-
-                    // CU-10: icono de favorito
+                    // CU-10: Boton favorito (solo si el usuario esta autenticado)
                     if (isAuthenticated) {
                         IconButton(
                             onClick = {
@@ -569,33 +573,122 @@ fun MapDetailView(
                     }
                 }
 
-                Spacer(Modifier.height(8.dp))
+                Spacer(Modifier.height(16.dp))
 
-                // CU-11: chip de tiempo estimado
-                when (val ts = routeTimeState) {
-                    is RouteTimeUiState.Result -> {
-                        AssistChip(
-                            onClick = {},
-                            label = {
-                                Text(
-                                    "~${ts.totalMinutes} min",
-                                    style = MaterialTheme.typography.labelMedium
-                                )
-                            },
-                            leadingIcon = {
-                                Icon(
-                                    Icons.Default.Schedule,
-                                    contentDescription = null,
-                                    modifier = Modifier.size(16.dp)
-                                )
-                            }
-                        )
-                        Spacer(Modifier.height(8.dp))
-                    }
-                    else -> Unit
+                val formattedId = routeId.padStart(3, '0')
+                val imagePath   = "files/images/routes/Xalapa/bus_$formattedId.jpg"
+                var imageBitmap by remember(imagePath) { mutableStateOf<ImageBitmap?>(null) }
+
+                LaunchedEffect(imagePath) {
+                    if (routeId.isNotEmpty()) {
+                        try {
+                            val bytes = Res.readBytes(imagePath)
+                            imageBitmap = bytes.decodeToImageBitmap()
+                        } catch (_: Exception) { imageBitmap = null }
+                    } else { imageBitmap = null }
                 }
 
-                // CU-23: botón calificar (solo para usuarios autenticados)
+                Card(
+                    modifier  = Modifier.fillMaxWidth().height(160.dp),
+                    shape     = MaterialTheme.shapes.large,
+                    elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+                ) {
+                    Box(
+                        contentAlignment = Alignment.Center,
+                        modifier = Modifier.fillMaxSize()
+                    ) {
+                        if (imageBitmap != null) {
+                            Image(
+                                bitmap       = imageBitmap!!,
+                                contentDescription = "Foto del autobus $formattedId",
+                                modifier     = Modifier.fillMaxSize(),
+                                contentScale = ContentScale.Crop
+                            )
+                        } else {
+                            // Placeholder cuando no hay imagen disponible
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .background(MaterialTheme.colorScheme.surfaceVariant),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Column(
+                                    horizontalAlignment = Alignment.CenterHorizontally,
+                                    verticalArrangement = Arrangement.Center
+                                ) {
+                                    Icon(
+                                        Icons.Default.DirectionsBus,
+                                        contentDescription = null,
+                                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        modifier = Modifier.size(40.dp)
+                                    )
+                                    Spacer(Modifier.height(4.dp))
+                                    Text(
+                                        "Ruta $formattedId",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+
+                Spacer(Modifier.height(20.dp))
+
+                // ── Seccion de Tarifas ────────────────────────────────────────────
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+                    ),
+                    shape = MaterialTheme.shapes.medium
+                ) {
+                    Column(modifier = Modifier.padding(12.dp)) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(
+                                Icons.Default.Payments,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(20.dp)
+                            )
+                            Spacer(Modifier.width(8.dp))
+                            Text(
+                                "Costos de Tarifa",
+                                style = MaterialTheme.typography.titleSmall,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                        Spacer(Modifier.height(8.dp))
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            FarePriceItem("General",     selectedRoute?.fare        ?: "12.00")
+                            FarePriceItem("Estudiantes", selectedRoute?.fareStudent ?: "7.00")
+                            FarePriceItem("INAPAN",      selectedRoute?.fareInapan  ?: "7.00")
+                        }
+                    }
+                }
+
+                Spacer(Modifier.height(16.dp))
+
+                // ── CU-11: Card de duracion total del trayecto ─────────────────
+                RouteTravelTimeCard(state = routeTimeState)
+
+                Spacer(Modifier.height(8.dp))
+
+                InfoItem(
+                    icon  = Icons.Default.Timer,
+                    label = "Frecuencia Estimada",
+                    value = selectedRoute?.frequency
+                        ?.let { if (it.isEmpty()) "N/A" else it }
+                        ?: "Consultando..."
+                )
+
+                Spacer(Modifier.height(16.dp))
+
+                // ── CU-23: Boton calificar ruta (solo para usuarios autenticados) ──
                 if (isAuthenticated && routeId.isNotEmpty()) {
                     OutlinedButton(
                         onClick  = { showRatingDialog = true },
@@ -611,23 +704,171 @@ fun MapDetailView(
                     }
                     Spacer(Modifier.height(8.dp))
                 }
+
+                // ── CU-09: Agregar parada ─────────────────────────────────────
+                OutlinedButton(
+                    onClick = {
+                        userLocation?.let { (lat, lng) ->
+                            reportsViewModel.submitStopHere(parsedRouteId, lat, lng)
+                        }
+                    },
+                    modifier = Modifier.fillMaxWidth(),
+                    enabled = stopState !is com.example.xalabus.ui.viewmodel.StopUiState.Loading &&
+                        userLocation != null && parsedRouteId > 0 && isAuthenticated
+                ) {
+                    if (stopState is com.example.xalabus.ui.viewmodel.StopUiState.Loading) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(18.dp),
+                            strokeWidth = 2.dp
+                        )
+                        Spacer(Modifier.width(8.dp))
+                    } else {
+                        Icon(Icons.Default.AddLocation, contentDescription = null)
+                        Spacer(Modifier.width(8.dp))
+                    }
+                    Text("Aqui hay una parada")
+                }
+
+                when {
+                    !isAuthenticated -> {
+                        Text(
+                            "Inicia sesion para reportar una parada.",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.padding(top = 4.dp)
+                        )
+                    }
+                    userLocation == null -> {
+                        Text(
+                            "Activa el GPS para reportar una parada en tu ubicacion.",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.padding(top = 4.dp)
+                        )
+                    }
+                    stopState is com.example.xalabus.ui.viewmodel.StopUiState.Error -> {
+                        Text(
+                            (stopState as com.example.xalabus.ui.viewmodel.StopUiState.Error).message,
+                            color = MaterialTheme.colorScheme.error,
+                            style = MaterialTheme.typography.labelSmall,
+                            modifier = Modifier.padding(top = 4.dp)
+                        )
+                    }
+                    stopState is com.example.xalabus.ui.viewmodel.StopUiState.Success -> {
+                        Text(
+                            (stopState as com.example.xalabus.ui.viewmodel.StopUiState.Success).message,
+                            color = MaterialTheme.colorScheme.primary,
+                            style = MaterialTheme.typography.labelSmall,
+                            modifier = Modifier.padding(top = 4.dp)
+                        )
+                    }
+                }
+
+                Spacer(Modifier.height(24.dp))
+                Text(
+                    "Reportar cambios en la ruta",
+                    style = MaterialTheme.typography.titleMedium,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+                Spacer(Modifier.height(8.dp))
+                OutlinedTextField(
+                    value = routeReportMessage,
+                    onValueChange = { routeReportMessage = it },
+                    placeholder = {
+                        Text(
+                            "Escribe aqui si la ruta cambio...",
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    },
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = MaterialTheme.shapes.medium,
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor      = MaterialTheme.colorScheme.primary,
+                        unfocusedBorderColor    = MaterialTheme.colorScheme.outline,
+                        focusedContainerColor   = MaterialTheme.colorScheme.surfaceVariant,
+                        unfocusedContainerColor = MaterialTheme.colorScheme.surfaceVariant,
+                        focusedTextColor        = MaterialTheme.colorScheme.onSurface,
+                        unfocusedTextColor      = MaterialTheme.colorScheme.onSurface,
+                        cursorColor             = MaterialTheme.colorScheme.primary,
+                    )
+                )
+
+                if (reportState is com.example.xalabus.ui.viewmodel.ReportUiState.Error) {
+                    Text(
+                        (reportState as com.example.xalabus.ui.viewmodel.ReportUiState.Error).message,
+                        color = MaterialTheme.colorScheme.error,
+                        style = MaterialTheme.typography.labelSmall
+                    )
+                }
+                if (reportState is com.example.xalabus.ui.viewmodel.ReportUiState.Success) {
+                    Text(
+                        "Reporte de ruta enviado!",
+                        color = MaterialTheme.colorScheme.primary,
+                        style = MaterialTheme.typography.labelSmall
+                    )
+                }
+
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
+                    horizontalArrangement = Arrangement.End,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Button(
+                        onClick = {
+                            reportsViewModel.submitRouteReport(parsedRouteId, routeReportMessage)
+                            if (reportState is com.example.xalabus.ui.viewmodel.ReportUiState.Success) {
+                                routeReportMessage = ""
+                                reportsViewModel.resetState()
+                            }
+                        },
+                        enabled = routeReportMessage.isNotBlank() &&
+                                reportState !is com.example.xalabus.ui.viewmodel.ReportUiState.Loading,
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = MaterialTheme.colorScheme.primary,
+                            contentColor   = MaterialTheme.colorScheme.onPrimary
+                        )
+                    ) {
+                        if (reportState is com.example.xalabus.ui.viewmodel.ReportUiState.Loading) {
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(16.dp),
+                                color = MaterialTheme.colorScheme.onPrimary,
+                                strokeWidth = 2.dp
+                            )
+                        } else {
+                            Icon(Icons.Default.Send, null, Modifier.size(18.dp))
+                            Spacer(Modifier.width(8.dp))
+                            Text("Enviar")
+                        }
+                    }
+                }
+                Spacer(Modifier.height(40.dp))
             }
         }
-    ) {
-        // contenido principal del scaffold (mapa)
-        MapScreen(
-            fileManager = fileManager,
-            viewModel = viewModel,
-            isDarkMode = isDarkMode,
-            routeTimeViewModel = routeTimeViewModel,
-            incidentViewModel = incidentViewModel,
-            onUserLocationChanged = { lat, lng ->
-                viewModel.updateUserLocation(lat, lng)
+    ) { innerPadding ->
+        Box(modifier = Modifier.padding(innerPadding).fillMaxSize()) {
+            MapScreen(
+                fileManager        = fileManager,
+                viewModel          = viewModel,
+                isDarkMode         = isDarkMode,
+                routeTimeViewModel = routeTimeViewModel,
+                incidentViewModel  = incidentViewModel,
+                onUserLocationChanged = { lat, lng ->
+                    viewModel.updateUserLocation(lat, lng)
+                }
+            )
+            FilledIconButton(
+                onClick  = onBack,
+                modifier = Modifier.padding(16.dp).size(48.dp).align(Alignment.TopStart),
+                colors   = IconButtonDefaults.filledIconButtonColors(
+                    containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.9f)
+                )
+            ) {
+                Icon(Icons.Default.ArrowBack, "Regresar", tint = MaterialTheme.colorScheme.onSurface)
             }
-        )
+        }
     }
 
-    // CU-23: diálogo de calificación desde MapDetail
+    // CU-23: dialogo de calificacion desde MapDetail
     if (showRatingDialog) {
         RatingDialog(
             routeName = selectedRoute?.name ?: "",
@@ -635,6 +876,124 @@ fun MapDetailView(
             userId    = authViewModel.currentUserId(),
             viewModel = ratingViewModel,
             onDismiss = { showRatingDialog = false }
+        )
+    }
+}
+
+/**
+ * CU-11: Card compacto que muestra la duracion total estimada del trayecto completo.
+ * Velocidad promedio fija: 32 km/h.
+ */
+@Composable
+fun RouteTravelTimeCard(state: RouteTimeUiState) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors   = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+        ),
+        shape = MaterialTheme.shapes.medium
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 14.dp, vertical = 12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(
+                    Icons.Default.DirectionsBus,
+                    contentDescription = null,
+                    tint     = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(22.dp)
+                )
+                Spacer(Modifier.width(10.dp))
+                Column {
+                    Text(
+                        "Duracion del trayecto",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Text(
+                        "Recorrido completo de la ruta",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+                    )
+                }
+            }
+            when (state) {
+                is RouteTimeUiState.Idle -> {
+                    CircularProgressIndicator(
+                        modifier    = Modifier.size(20.dp),
+                        strokeWidth = 2.dp,
+                        color       = MaterialTheme.colorScheme.primary
+                    )
+                }
+                is RouteTimeUiState.Result -> {
+                    Column(horizontalAlignment = Alignment.End) {
+                        Text(
+                            "~${state.formattedTime}",
+                            style      = MaterialTheme.typography.titleLarge,
+                            fontWeight = FontWeight.Bold,
+                            color      = MaterialTheme.colorScheme.primary
+                        )
+                        Text(
+                            "${state.distanceKm} km · 32 km/h",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+/** Muestra el precio de una tarifa con etiqueta centrada. */
+@Composable
+fun FarePriceItem(label: String, price: String) {
+    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+        Text(
+            text  = "$$price",
+            style = MaterialTheme.typography.titleMedium,
+            fontWeight = FontWeight.Bold,
+            color = MaterialTheme.colorScheme.primary
+        )
+        Text(
+            text  = label,
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+    }
+}
+
+/** Fila de informacion con icono, etiqueta y valor. */
+@Composable
+fun InfoItem(icon: ImageVector, label: String, value: String) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 4.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Icon(
+            imageVector        = icon,
+            contentDescription = null,
+            tint               = MaterialTheme.colorScheme.primary,
+            modifier           = Modifier.size(18.dp)
+        )
+        Spacer(Modifier.width(8.dp))
+        Text(
+            text  = label,
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.weight(1f)
+        )
+        Text(
+            text  = value,
+            style = MaterialTheme.typography.bodySmall,
+            fontWeight = FontWeight.Medium,
+            color = MaterialTheme.colorScheme.onSurface
         )
     }
 }
