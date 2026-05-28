@@ -49,7 +49,17 @@ class RouteViewModel(
     private val _selectedZone = MutableStateFlow<String?>(null)
     val selectedZone: StateFlow<String?> = _selectedZone
 
-    val availableZones = listOf("Centro", "Trancas", "Sumidero", "UV", "Lázaro Cárdenas", "Coapexpan", "Bugambilias")
+    val availableZones = listOf(
+        "20 de Noviembre", "Araucarias", "Arco Sur", "Articulo 3ro", "Av. Xalapa", "Avila Camacho",
+        "Berros", "Buena Vista", "Bugambilias", "Calvario", "Campo de Tiro", "Carolino Anaya",
+        "Casa Blanca", "Caxa", "Central de Abastos", "Centro", "Clavijero", "Coapexpan", "Estación",
+        "Fovissste", "Hernandez Castillo", "IMSS", "Ignacio de la Llave", "Instituto Tecnológico",
+        "Jardines", "Lázaro Cárdenas", "Lomas Verdes", "Luz del Barrio", "Mercado", "Murillo Vidal",
+        "Ojo de agua", "Pastoresa", "Pipila", "Plaza Crystal", "Rebsamen", "Revolución", "Ruiz Cortines",
+        "SEFIPLAN", "San Andrés Tlalnehuayocan", "San Antonio", "Sauces", "Sayago", "Sumidero",
+        "Tecnica 72", "Torre Ánimas", "Trancas", "Villa Hermosa", "Xalapa", "Xalapa 2000",
+        "Xocotla", "Zona UV"
+    )
 
     // 3. La lista COMPLETA de rutas que viene de la base de datos
     private val _allRoutes = MutableStateFlow<List<RouteEntity>>(emptyList())
