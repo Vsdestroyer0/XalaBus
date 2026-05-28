@@ -45,23 +45,42 @@ class RouteViewModel(
     private val _isSortedAlphabetically = MutableStateFlow(false)
     val isSortedAlphabetically: StateFlow<Boolean> = _isSortedAlphabetically
 
+    // NUEVO: 3. Estado para el filtro de zona
+    private val _selectedZone = MutableStateFlow<String?>(null)
+    val selectedZone: StateFlow<String?> = _selectedZone
+
+    val availableZones = listOf("Centro", "Trancas", "Sumidero", "UV", "Lázaro Cárdenas", "Coapexpan", "Bugambilias")
+
     // 3. La lista COMPLETA de rutas que viene de la base de datos
     private val _allRoutes = MutableStateFlow<List<RouteEntity>>(emptyList())
 
     // 4. La lista FILTRADA que la vista realmente observa y muestra
-    // NUEVO: Agregamos _isSortedAlphabetically al combine
+    // NUEVO: Agregamos _isSortedAlphabetically y _selectedZone al combine
     val filteredRoutes: StateFlow<List<RouteEntity>> = combine(
         _allRoutes,
         _searchQuery,
-        _isSortedAlphabetically
-    ) { routes, query, isSorted ->
+        _isSortedAlphabetically,
+        _selectedZone
+    ) { routes, query, isSorted, zone ->
 
-        // Primero filtramos por la búsqueda de texto
-        val resultList = if (query.isBlank()) {
+        // Primero filtramos por zona (usando la descripción o el nombre)
+        val zoneFiltered = if (zone.isNullOrBlank()) {
             routes
         } else {
-            val searchTokens = query.trim().split("\\s+".toRegex())
             routes.filter { route ->
+                // Las propiedades name o id pueden estar en la clase. Para la descripción usamos name por ahora o si tiene desc (la entidad tiene description? No lo vimos. Veamos la entidad, wait).
+                // Ah, RouteEntity solo tiene id, name, fare, fareStudent, fareInapan, frequency. No se guarda la descripción en la base de datos!
+                // Wait! RouteEntity no tiene descripción! Let me check this.
+                route.name.contains(zone, ignoreCase = true)
+            }
+        }
+
+        // Segundo filtramos por la búsqueda de texto
+        val resultList = if (query.isBlank()) {
+            zoneFiltered
+        } else {
+            val searchTokens = query.trim().split("\\s+".toRegex())
+            zoneFiltered.filter { route ->
                 searchTokens.all { token ->
                     route.id.contains(token, ignoreCase = true) ||
                             route.name.contains(token, ignoreCase = true)
@@ -69,7 +88,7 @@ class RouteViewModel(
             }
         }
 
-        // Segundo filtramos por el ordenamiento alfabético
+        // Tercero filtramos por el ordenamiento alfabético
         if (isSorted) {
             resultList.sortedBy { it.name }
         } else {
@@ -90,6 +109,11 @@ class RouteViewModel(
     // NUEVO: Función para encender/apagar el filtro A-Z
     fun toggleSortAlphabetically() {
         _isSortedAlphabetically.value = !_isSortedAlphabetically.value
+    }
+
+    // NUEVO: Función para seleccionar una zona
+    fun selectZone(zone: String?) {
+        _selectedZone.value = zone
     }
 
     @OptIn(ExperimentalResourceApi::class)

@@ -32,7 +32,9 @@ fun HomeScreen(
 ) {
     val routes by viewModel.filteredRoutes.collectAsState()
     val searchText by viewModel.searchQuery.collectAsState()
+    val selectedZone by viewModel.selectedZone.collectAsState()
     var showFaq by remember { mutableStateOf(false) }
+    var expandedZoneMenu by remember { mutableStateOf(false) }
 
     Scaffold(
         topBar = {
@@ -118,6 +120,46 @@ fun HomeScreen(
                     )
                 }
             }
+
+            // NUEVO: Filtro por zona
+            Box(modifier = Modifier.padding(horizontal = 16.dp, vertical = 0.dp).fillMaxWidth()) {
+                OutlinedButton(
+                    onClick = { expandedZoneMenu = true },
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(16.dp)
+                ) {
+                    Text(
+                        text = if (selectedZone.isNullOrBlank()) "Filtrar por Zona" else "Zona: $selectedZone",
+                        style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold)
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Icon(Icons.Default.ArrowDropDown, contentDescription = "Seleccionar Zona")
+                }
+
+                DropdownMenu(
+                    expanded = expandedZoneMenu,
+                    onDismissRequest = { expandedZoneMenu = false },
+                    modifier = Modifier.fillMaxWidth(0.9f)
+                ) {
+                    DropdownMenuItem(
+                        text = { Text("Todas las zonas") },
+                        onClick = {
+                            viewModel.selectZone(null)
+                            expandedZoneMenu = false
+                        }
+                    )
+                    viewModel.availableZones.forEach { zone ->
+                        DropdownMenuItem(
+                            text = { Text(zone) },
+                            onClick = {
+                                viewModel.selectZone(zone)
+                                expandedZoneMenu = false
+                            }
+                        )
+                    }
+                }
+            }
+
 
             Text(
                 text = if (routes.isEmpty() && searchText.isNotEmpty())
