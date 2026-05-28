@@ -207,4 +207,80 @@ class RouteViewModel(
             Json.decodeFromString<List<List<Double>>>(geometryEntity.polyline)
         }
     }
+
+    // --- NUEVO: Funcionalidad para GPS y Mejor Ruta ---
+    private val _userLocation = MutableStateFlow<Pair<Double, Double>?>(null)
+    val userLocation: StateFlow<Pair<Double, Double>?> = _userLocation
+
+    private val _destinationLocation = MutableStateFlow<Pair<Double, Double>?>(null)
+    val destinationLocation: StateFlow<Pair<Double, Double>?> = _destinationLocation
+
+    fun setUserLocation(lat: Double, lng: Double) {
+        _userLocation.value = Pair(lat, lng)
+    }
+
+    fun setDestinationLocation(lat: Double, lng: Double?) {
+        if (lat == null || lng == null) {
+            _destinationLocation.value = null
+        } else {
+            _destinationLocation.value = Pair(lat, lng)
+        }
+    }
+
+    private fun calculateDistance(lat1: Double, lon1: Double, lat2: Double, lon2: Double): Double {
+        val r = 6371.0 // Radio de la Tierra en km
+        val dLat = (lat2 - lat1) * kotlin.math.PI / 180.0
+        val dLon = (lon2 - lon1) * kotlin.math.PI / 180.0
+        val a = kotlin.math.sin(dLat / 2) * kotlin.math.sin(dLat / 2) +
+                kotlin.math.cos(lat1 * kotlin.math.PI / 180.0) * kotlin.math.cos(lat2 * kotlin.math.PI / 180.0) *
+                kotlin.math.sin(dLon / 2) * kotlin.math.sin(dLon / 2)
+        val c = 2 * kotlin.math.atan2(kotlin.math.sqrt(a), kotlin.math.sqrt(1 - a))
+        return r * c
+    }
+
+    fun calculateBestRoute() {
+        val userLoc = _userLocation.value ?: return
+        val destLoc = _destinationLocation.value ?: return
+
+        viewModelScope.launch(Dispatchers.IO) {
+            var bestRouteId: String? = null
+            var minScore = Double.MAX_VALUE
+
+            _allRoutes.value.forEach { route ->
+                val points = getRoutePoints(route.id)
+                if (points.isNotEmpty()) {
+                    val flatPoints = points.flatten()
+                    
+                    var minUserDist = Double.MAX_VALUE
+                    var minDestDist = Double.MAX_VALUE
+
+                    flatPoints.forEach { point ->
+                        if (point.size >= 2) {
+                            val lng = point[0]
+                            val lat = point[1]
+                            
+                            val userDist = calculateDistance(userLoc.first, userLoc.second, lat, lng)
+                            if (userDist < minUserDist) minUserDist = userDist
+
+                            val destDist = calculateDistance(destLoc.first, destLoc.second, lat, lng)
+                            if (destDist < minDestDist) minDestDist = destDist
+                        }
+                    }
+
+                    // Se suma la distancia desde el usuario a la ruta + distancia de la ruta al destino
+                    val score = minUserDist + minDestDist
+                    if (score < minScore) {
+                        minScore = score
+                        bestRouteId = route.id
+                    }
+                }
+            }
+
+            bestRouteId?.let { 
+                launch(Dispatchers.Main) {
+                    selectRoute(it)
+                }
+            }
+        }
+    }
 }

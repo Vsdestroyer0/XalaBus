@@ -11,6 +11,14 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.viewinterop.AndroidView
+import androidx.compose.foundation.layout.padding
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.unit.dp
+import androidx.compose.material3.ExtendedFloatingActionButton
+import androidx.compose.material3.Icon
+import androidx.compose.material3.Text
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Directions
 import androidx.core.content.ContextCompat
 import com.example.xalabus.ui.viewmodel.RouteTimeViewModel
 import com.example.xalabus.ui.viewmodel.RouteViewModel
@@ -27,6 +35,7 @@ import org.maplibre.android.maps.MapLibreMap
 import org.maplibre.android.maps.MapView
 import org.maplibre.android.maps.Style
 import org.maplibre.android.style.layers.LineLayer
+import org.maplibre.android.style.layers.CircleLayer
 import org.maplibre.android.style.layers.Property
 import org.maplibre.android.style.layers.PropertyFactory
 import org.maplibre.android.style.sources.GeoJsonSource
@@ -50,6 +59,7 @@ actual fun MapScreen(
 
     var mapLibreMap by remember { mutableStateOf<MapLibreMap?>(null) }
     var loadedStyle by remember { mutableStateOf<Style?>(null) }
+    val destination by viewModel.destinationLocation.collectAsState()
 
     // --- GESTIÓN DE PERMISOS ---
     val permissionLauncher = rememberLauncherForActivityResult(
@@ -80,6 +90,11 @@ actual fun MapScreen(
         mapView.getMapAsync { map ->
             mapLibreMap = map
             map.moveCamera(CameraUpdateFactory.newLatLngZoom(xalapaCenter, 13.0))
+
+            map.addOnMapLongClickListener { point ->
+                viewModel.setDestinationLocation(point.latitude, point.longitude)
+                true
+            }
 
             val styleFileName = if (isDarkMode) "style_dark.json" else "style.json"
             val styleJson = context.assets.open(styleFileName).bufferedReader().use { it.readText() }
@@ -139,12 +154,57 @@ actual fun MapScreen(
         }
     }
 
+    // ── Efecto 3: Dibujar marcador de destino ─────────────────────────────────
+    LaunchedEffect(destination, loadedStyle) {
+        val style = loadedStyle ?: return@LaunchedEffect
+        val dest = destination
+        val sourceId = "destination-source"
+        val layerId = "destination-layer"
+
+        if (dest != null) {
+            val point = Point.fromLngLat(dest.second, dest.first)
+            val source = style.getSourceAs<GeoJsonSource>(sourceId)
+            if (source == null) {
+                style.addSource(GeoJsonSource(sourceId, point.toJson()))
+                style.addLayer(CircleLayer(layerId, sourceId).apply {
+                    setProperties(
+                        PropertyFactory.circleRadius(8f),
+                        PropertyFactory.circleColor(android.graphics.Color.RED)
+                    )
+                })
+            } else {
+                source.setGeoJson(point.toJson())
+            }
+        } else {
+            // Eliminar o esconder el destino si es nulo
+            style.getSourceAs<GeoJsonSource>(sourceId)
+                ?.setGeoJson(LineString.fromLngLats(emptyList()).toJson())
+        }
+    }
+
     // ── UI: solo el mapa (CU-11 se muestra en el bottom sheet de App.kt) ─────
     Box(modifier = Modifier.fillMaxSize()) {
         AndroidView(
             factory = { mapView },
             modifier = Modifier.fillMaxSize()
         )
+
+        if (destination != null) {
+            ExtendedFloatingActionButton(
+                onClick = {
+                    val loc = mapLibreMap?.locationComponent?.lastKnownLocation
+                    if (loc != null) {
+                        viewModel.setUserLocation(loc.latitude, loc.longitude)
+                        viewModel.calculateBestRoute()
+                    }
+                },
+                modifier = Modifier
+                    .align(Alignment.BottomEnd)
+                    .padding(end = 16.dp, bottom = 120.dp), // Separado del borde inferior por otros elementos de la UI
+                icon = { Icon(Icons.Default.Directions, contentDescription = "Mejor Ruta") },
+                text = { Text("Mejor Ruta") }
+            )
+        }
     }
 }
 
