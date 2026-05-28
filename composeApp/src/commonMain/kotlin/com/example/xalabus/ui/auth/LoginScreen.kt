@@ -36,7 +36,6 @@ fun LoginScreen(
     onLoginSuccess: () -> Unit,
     onNavigateToRegister: () -> Unit,
     onBack: () -> Unit,
-    // CU-03: nuevo callback para navegar a recuperar contraseña
     onForgotPassword: () -> Unit = {}
 ) {
     val uiState by viewModel.uiState.collectAsState()
@@ -46,16 +45,19 @@ fun LoginScreen(
     var password by remember { mutableStateOf("") }
     var passwordVisible by remember { mutableStateOf(false) }
 
-    // Resetear estado al entrar a la pantalla para evitar que un Success/Error
-    // residual de una sesión anterior dispare la navegación inmediatamente
+    // Resetear estado al ENTRAR a la pantalla para limpiar errores residuales.
+    // NO se resetea despues del login exitoso para que App.kt pueda leer Success.
     LaunchedEffect(Unit) {
         viewModel.resetState()
     }
 
     LaunchedEffect(uiState) {
         if (uiState is AuthUiState.Success) {
+            // Solo navegar. App.kt observa uiState y actualiza isAuthenticated
+            // antes de que se haga cualquier reset.
             onLoginSuccess()
-            viewModel.resetState()
+            // El reset ocurrira cuando el usuario regrese al LoginScreen
+            // via el LaunchedEffect(Unit) de arriba.
         }
     }
 
@@ -86,7 +88,7 @@ fun LoginScreen(
             // ── Botón Volver ──────────────────────────────────────────────────
             IconButton(
                 onClick = {
-                    viewModel.resetState() // limpiar estado al salir sin logearse
+                    viewModel.resetState()
                     onBack()
                 },
                 modifier = Modifier
