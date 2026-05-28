@@ -46,6 +46,12 @@ fun LoginScreen(
     var password by remember { mutableStateOf("") }
     var passwordVisible by remember { mutableStateOf(false) }
 
+    // Resetear estado al entrar a la pantalla para evitar que un Success/Error
+    // residual de una sesión anterior dispare la navegación inmediatamente
+    LaunchedEffect(Unit) {
+        viewModel.resetState()
+    }
+
     LaunchedEffect(uiState) {
         if (uiState is AuthUiState.Success) {
             onLoginSuccess()
@@ -79,7 +85,10 @@ fun LoginScreen(
         ) {
             // ── Botón Volver ──────────────────────────────────────────────────
             IconButton(
-                onClick = onBack,
+                onClick = {
+                    viewModel.resetState() // limpiar estado al salir sin logearse
+                    onBack()
+                },
                 modifier = Modifier
                     .background(XalaSurface, shape = RoundedCornerShape(12.dp))
                     .size(44.dp)
