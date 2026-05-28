@@ -10,7 +10,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 
-// ── Estados CU-23 (Ratear ruta) ───────────────────────────────────────────────
+// ── Estados CU-23 (Ratear ruta) ─────────────────────────────────────────────
 sealed class RatingUiState {
     object Idle    : RatingUiState()
     object Loading : RatingUiState()
@@ -18,7 +18,7 @@ sealed class RatingUiState {
     data class Error(val message: String) : RatingUiState()
 }
 
-// ── Estados CU-24 (Visualizar rutas mejor rateadas) ──────────────────────────
+// ── Estados CU-24 (Visualizar rutas mejor rateadas) ──────────────────────
 sealed class TopRatedUiState {
     object Idle    : TopRatedUiState()
     object Loading : TopRatedUiState()
@@ -35,7 +35,7 @@ class RatingViewModel(
 ) {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
 
-    // ── CU-23 ─────────────────────────────────────────────────────────────────
+    // ── CU-23 ───────────────────────────────────────────────────────────────
     private val _ratingState = MutableStateFlow<RatingUiState>(RatingUiState.Idle)
     val ratingState: StateFlow<RatingUiState> = _ratingState.asStateFlow()
 
@@ -51,10 +51,11 @@ class RatingViewModel(
     }
 
     /**
-     * CU-23 flujo normal: valida rango [1-5], guarda y notifica.
+     * CU-23 flujo normal: valida rango [1-5], sanitiza comentario, guarda y notifica.
      * C23-2: score fuera de [1,5] → Error sin guardar.
-     * C23-3: fallo de red → Error con mensaje de reintento.
+     * C23-3: fallo de red → Error con mensaje claro de reintento.
      * C23-4: sin userId → Error "Debes iniciar sesión".
+     * C23-5: comentario sanitizado (trim) antes de persistir.
      */
     fun submitRating(
         routeId: String,
@@ -74,26 +75,37 @@ class RatingViewModel(
             return
         }
 
+        // C23-5: sanitizar comentario (trim + null si está vacío tras limpieza)
+        val sanitizedComment = comment?.trim()?.takeIf { it.isNotBlank() }
+
         _ratingState.value = RatingUiState.Loading
         scope.launch {
-            repository.saveRating(routeId, routeName, userId, score, comment)
+            repository.saveRating(routeId, routeName, userId, score, sanitizedComment)
                 .onSuccess {
                     _currentUserScore.value = score
                     _ratingState.value = RatingUiState.Success
-                    loadTopRated(refresh = true) // actualiza el ranking
+                    loadTopRated(refresh = true) // actualiza el ranking tras calificar
                 }
                 .onFailure { e ->
-                    // C23-3: error de red
-                    _ratingState.value = RatingUiState.Error(
-                        e.message ?: "Error de red. Intenta de nuevo."
-                    )
+                    // C23-3: error de red — mensaje explícito para el usuario
+                    val msg = when {
+                        e.message?.contains("network", ignoreCase = true) == true ||
+                        e.message?.contains("connect", ignoreCase = true) == true ||
+                        e.message?.contains("timeout", ignoreCase = true) == true ->
+                            "Sin conexión. Verifica tu red e intenta de nuevo."
+                        else -> e.message ?: "Error al guardar la calificación. Intenta de nuevo."
+                    }
+                    _ratingState.value = RatingUiState.Error(msg)
                 }
         }
     }
 
-    fun resetRatingState() { _ratingState.value = RatingUiState.Idle }
+    fun resetRatingState() {
+        _ratingState.value = RatingUiState.Idle
+        _currentUserScore.value = null
+    }
 
-    // ── CU-24 ─────────────────────────────────────────────────────────────────
+    // ── CU-24 ───────────────────────────────────────────────────────────────
     private val _topRatedState = MutableStateFlow<TopRatedUiState>(TopRatedUiState.Idle)
     val topRatedState: StateFlow<TopRatedUiState> = _topRatedState.asStateFlow()
 
@@ -108,6 +120,7 @@ class RatingViewModel(
             currentPage = 0
             loadedRoutes.clear()
         }
+        // Evita cargas duplicadas mientras ya está cargando
         if (_topRatedState.value is TopRatedUiState.Loading) return
 
         _topRatedState.value = TopRatedUiState.Loading
@@ -125,17 +138,24 @@ class RatingViewModel(
                     }
                 }
                 .onFailure { e ->
-                    // C24-5: error de conexión
-                    _topRatedState.value = TopRatedUiState.Error(
-                        e.message ?: "Error al cargar datos."
-                    )
+                    // C24-5: error de conexión — si hay datos en caché (loadedRoutes) los conserva
+                    if (loadedRoutes.isNotEmpty()) {
+                        _topRatedState.value = TopRatedUiState.Success(
+                            routes  = loadedRoutes.toList(),
+                            hasMore = false
+                        )
+                    } else {
+                        _topRatedState.value = TopRatedUiState.Error(
+                            e.message ?: "Error al cargar datos. Verifica tu conexión."
+                        )
+                    }
                 }
         }
     }
 
     /** C24-4: aplica filtro por ciudad y recarga desde el inicio */
     fun applyCityFilter(city: String?) {
-        cityFilter = city
+        cityFilter = city?.trim()?.takeIf { it.isNotBlank() }
         loadTopRated(refresh = true)
     }
 }
