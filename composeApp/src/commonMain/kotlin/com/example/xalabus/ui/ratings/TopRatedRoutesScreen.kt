@@ -14,32 +14,25 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import com.example.xalabus.data.SupabaseClientProvider
-import com.example.xalabus.ui.viewmodel.RouteWithAvgRating
+import com.example.xalabus.data.ratings.RouteWithAvgRating
 import com.example.xalabus.ui.viewmodel.RatingViewModel
 import com.example.xalabus.ui.viewmodel.TopRatedUiState
-import io.github.jan.supabase.auth.auth
 
 /**
- * CU-24: Pantalla pública de rutas mejor calificadas (ordenadas por promedio desc).
- * Accesible sin login. El botón "Calificar" solo aparece si hay sesión activa.
- * Cubre: C24-1 (lista ordenada), C24-2 (vacío), C24-3 (paginación scroll),
- *        C24-4 (filtro ciudad), C24-5 (error conexión).
+ * CU-24: Pantalla de rutas mejor calificadas, ordenadas por promedio descendente.
+ * Cubre: C24-1 (lista ordenada + puntuación/conteo), C24-2 (estado vacío),
+ *        C24-3 (paginación scroll incremental), C24-4 (filtro ciudad),
+ *        C24-5 (error conexión + reintento).
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun TopRatedRoutesScreen(
     viewModel: RatingViewModel,
     onRouteClick: (String) -> Unit,
-    onRateRoute: (routeId: String, routeName: String) -> Unit,
     onDismiss: () -> Unit
 ) {
-    val uiState   by viewModel.topRatedState.collectAsState()
-    val listState  = rememberLazyListState()
-
-    val isAuthenticated = remember {
-        SupabaseClientProvider.client.auth.currentSessionOrNull() != null
-    }
+    val uiState  by viewModel.topRatedState.collectAsState()
+    val listState = rememberLazyListState()
 
     var showFilterDialog by remember { mutableStateOf(false) }
     var cityInput        by remember { mutableStateOf(viewModel.cityFilter ?: "") }
@@ -51,18 +44,12 @@ fun TopRatedRoutesScreen(
         }
     }
 
-    // C24-3: paginación incremental al acercarse al final de la lista
-    val lastVisibleIndex by remember {
-        derivedStateOf { listState.layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: 0 }
-    }
-    val totalItems by remember {
-        derivedStateOf { listState.layoutInfo.totalItemsCount }
-    }
-    LaunchedEffect(lastVisibleIndex) {
+    // C24-3: paginación incremental al llegar al final de la lista
+    LaunchedEffect(listState.firstVisibleItemIndex) {
+        val lastVisible = listState.layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: 0
+        val total       = listState.layoutInfo.totalItemsCount
         val state = uiState
-        if (state is TopRatedUiState.Success && state.hasMore && totalItems > 0
-            && lastVisibleIndex >= totalItems - 3
-        ) {
+        if (state is TopRatedUiState.Success && state.hasMore && lastVisible >= total - 3) {
             viewModel.loadTopRated()
         }
     }
@@ -77,16 +64,14 @@ fun TopRatedRoutesScreen(
                     }
                 },
                 actions = {
-                    // C24-4: filtro por ciudad
+                    // C24-4: botón de filtro por ciudad
                     IconButton(onClick = { showFilterDialog = true }) {
                         Icon(Icons.Default.FilterList, contentDescription = "Filtrar por ciudad")
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
                     containerColor    = MaterialTheme.colorScheme.primaryContainer,
-                    titleContentColor = MaterialTheme.colorScheme.onPrimaryContainer,
-                    navigationIconContentColor = MaterialTheme.colorScheme.onPrimaryContainer,
-                    actionIconContentColor     = MaterialTheme.colorScheme.onPrimaryContainer
+                    titleContentColor = MaterialTheme.colorScheme.onPrimaryContainer
                 )
             )
         }
@@ -94,34 +79,31 @@ fun TopRatedRoutesScreen(
         Box(modifier = Modifier.fillMaxSize().padding(padding)) {
             when (val state = uiState) {
 
-                // ── Cargando primera página ───────────────────────────────
+                // ── Cargando ─────────────────────────────────────────────
                 is TopRatedUiState.Loading -> {
                     Column(
-                        modifier              = Modifier.fillMaxSize(),
-                        verticalArrangement   = Arrangement.Center,
-                        horizontalAlignment   = Alignment.CenterHorizontally
+                        modifier            = Modifier.fillMaxSize(),
+                        verticalArrangement = Arrangement.Center,
+                        horizontalAlignment = Alignment.CenterHorizontally
                     ) {
                         CircularProgressIndicator(color = MaterialTheme.colorScheme.primary)
                         Spacer(Modifier.height(12.dp))
-                        Text(
-                            "Cargando rutas...",
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
+                        Text("Cargando rutas...", color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                 }
 
-                // ── C24-2: Sin rutas calificadas ──────────────────────────
+                // ── C24-2: Sin calificaciones ─────────────────────────────
                 is TopRatedUiState.Empty -> {
                     Column(
-                        modifier              = Modifier.fillMaxSize().padding(32.dp),
-                        verticalArrangement   = Arrangement.Center,
-                        horizontalAlignment   = Alignment.CenterHorizontally
+                        modifier            = Modifier.fillMaxSize().padding(32.dp),
+                        verticalArrangement = Arrangement.Center,
+                        horizontalAlignment = Alignment.CenterHorizontally
                     ) {
                         Icon(
                             Icons.Default.Star,
                             contentDescription = null,
-                            modifier           = Modifier.size(64.dp),
-                            tint               = MaterialTheme.colorScheme.outline
+                            modifier = Modifier.size(64.dp),
+                            tint     = MaterialTheme.colorScheme.outline
                         )
                         Spacer(Modifier.height(16.dp))
                         Text(
@@ -131,7 +113,7 @@ fun TopRatedRoutesScreen(
                         )
                         Spacer(Modifier.height(8.dp))
                         Text(
-                            "Explora las rutas disponibles y sé el primero en calificar.",
+                            "Explora las rutas y sé el primero en calificar.",
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -143,9 +125,9 @@ fun TopRatedRoutesScreen(
                 // ── C24-5: Error de conexión ──────────────────────────────
                 is TopRatedUiState.Error -> {
                     Column(
-                        modifier              = Modifier.fillMaxSize().padding(32.dp),
-                        verticalArrangement   = Arrangement.Center,
-                        horizontalAlignment   = Alignment.CenterHorizontally
+                        modifier            = Modifier.fillMaxSize().padding(32.dp),
+                        verticalArrangement = Arrangement.Center,
+                        horizontalAlignment = Alignment.CenterHorizontally
                     ) {
                         Text(
                             "Error al cargar datos",
@@ -166,15 +148,15 @@ fun TopRatedRoutesScreen(
                     }
                 }
 
-                // ── C24-1 + C24-3: Lista ordenada ─────────────────────────
+                // ── C24-1 + C24-3: Lista de rutas ─────────────────────────
                 is TopRatedUiState.Success -> {
                     LazyColumn(
-                        state               = listState,
-                        contentPadding      = PaddingValues(12.dp),
+                        state           = listState,
+                        contentPadding  = PaddingValues(12.dp),
                         verticalArrangement = Arrangement.spacedBy(8.dp),
-                        modifier            = Modifier.fillMaxSize()
+                        modifier        = Modifier.fillMaxSize()
                     ) {
-                        // Badge de filtro activo (C24-4)
+                        // Chip de filtro activo
                         if (viewModel.cityFilter != null) {
                             item {
                                 FilterChip(
@@ -183,20 +165,17 @@ fun TopRatedRoutesScreen(
                                         cityInput = ""
                                         viewModel.applyCityFilter(null)
                                     },
-                                    label    = { Text("Ciudad: ${viewModel.cityFilter}  ✕") },
-                                    modifier = Modifier.padding(bottom = 4.dp)
+                                    label = { Text("Ciudad: ${viewModel.cityFilter}  \u2715") }
                                 )
                             }
                         }
 
-                        // Items ordenados por avg_score desc (C24-1)
+                        // C24-1: tarjetas ordenadas por promedio desc
                         items(state.routes, key = { it.id }) { route ->
                             TopRatedRouteCard(
-                                route        = route,
-                                position     = state.routes.indexOf(route) + 1,
-                                isAuthenticated = isAuthenticated,
-                                onRouteClick = { onRouteClick(route.id) },
-                                onRateClick  = { onRateRoute(route.id, route.name) }
+                                route    = route,
+                                position = state.routes.indexOf(route) + 1,
+                                onClick  = { onRouteClick(route.id) }
                             )
                         }
 
@@ -222,12 +201,12 @@ fun TopRatedRoutesScreen(
         }
     }
 
-    // ── C24-4: Diálogo de filtro por ciudad ──────────────────────────────────
+    // ── C24-4: Diálogo de filtro por ciudad ───────────────────────────────
     if (showFilterDialog) {
         AlertDialog(
             onDismissRequest = { showFilterDialog = false },
-            title   = { Text("Filtrar por ciudad") },
-            text    = {
+            title  = { Text("Filtrar por ciudad") },
+            text   = {
                 OutlinedTextField(
                     value         = cityInput,
                     onValueChange = { cityInput = it },
@@ -250,17 +229,15 @@ fun TopRatedRoutesScreen(
     }
 }
 
-// ── Tarjeta individual de ruta ────────────────────────────────────────────────
+// ── Tarjeta individual (C24-1: muestra puntuación promedio y conteo) ──────────
 @Composable
 private fun TopRatedRouteCard(
     route: RouteWithAvgRating,
     position: Int,
-    isAuthenticated: Boolean,
-    onRouteClick: () -> Unit,
-    onRateClick: () -> Unit
+    onClick: () -> Unit
 ) {
     Card(
-        onClick   = onRouteClick,
+        onClick   = onClick,
         modifier  = Modifier.fillMaxWidth(),
         colors    = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.surface
@@ -272,7 +249,7 @@ private fun TopRatedRouteCard(
             verticalAlignment     = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            // Posición
+            // Posición en el ranking
             Text(
                 "#$position",
                 style      = MaterialTheme.typography.titleMedium,
@@ -281,7 +258,6 @@ private fun TopRatedRouteCard(
                 modifier   = Modifier.width(36.dp)
             )
 
-            // Nombre y conteo
             Column(modifier = Modifier.weight(1f)) {
                 Text(
                     route.name,
@@ -289,6 +265,7 @@ private fun TopRatedRouteCard(
                     fontWeight = FontWeight.SemiBold
                 )
                 Spacer(Modifier.height(4.dp))
+                // C24-1: muestra número de valoraciones
                 Text(
                     "${route.ratingCount} valoraciones",
                     style = MaterialTheme.typography.bodySmall,
@@ -296,7 +273,7 @@ private fun TopRatedRouteCard(
                 )
             }
 
-            // Promedio con estrella (C24-1)
+            // C24-1: puntuación promedio + estrella
             Row(
                 verticalAlignment     = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(4.dp)
@@ -313,28 +290,6 @@ private fun TopRatedRouteCard(
                     fontWeight = FontWeight.Bold,
                     color      = MaterialTheme.colorScheme.primary
                 )
-            }
-        }
-
-        // Botón calificar: solo visible para usuarios autenticados (C23-4)
-        if (isAuthenticated) {
-            HorizontalDivider(
-                modifier = Modifier.padding(horizontal = 16.dp),
-                color    = MaterialTheme.colorScheme.outlineVariant
-            )
-            TextButton(
-                onClick  = onRateClick,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 8.dp, vertical = 4.dp)
-            ) {
-                Icon(
-                    Icons.Default.Star,
-                    contentDescription = null,
-                    modifier           = Modifier.size(16.dp)
-                )
-                Spacer(Modifier.width(4.dp))
-                Text("Calificar esta ruta")
             }
         }
     }
