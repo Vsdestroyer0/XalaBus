@@ -373,6 +373,7 @@ private fun MainAppContent(
                     reportsViewModel   = reportsViewModel,
                     favoritosViewModel = favoritosViewModel,
                     routeTimeViewModel = routeTimeViewModel,
+                    incidentViewModel  = incidentViewModel,
                     isDarkMode         = isDarkMode,
                     isAuthenticated    = isAuthenticated,
                     onBack             = {
@@ -400,6 +401,7 @@ fun MapDetailView(
     reportsViewModel: com.example.xalabus.ui.viewmodel.ReportsViewModel,
     favoritosViewModel: FavoritosViewModel,
     routeTimeViewModel: RouteTimeViewModel,
+     incidentViewModel: IncidentViewModel,
     isDarkMode: Boolean,
     isAuthenticated: Boolean,
     onBack: () -> Unit
@@ -755,6 +757,7 @@ fun MapDetailView(
                 viewModel          = viewModel,
                 isDarkMode         = isDarkMode,
                 routeTimeViewModel = routeTimeViewModel,
+                incidentViewModel  = incidentViewModel,
                 onUserLocationChanged = { lat, lng ->
                     viewModel.updateUserLocation(lat, lng)
                 }
