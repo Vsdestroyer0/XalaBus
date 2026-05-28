@@ -1,6 +1,6 @@
 package com.example.xalabus.data.ratings
 
-import com.example.xalabus.core.supabase.SupabaseClientProvider
+import com.example.xalabus.data.SupabaseClientProvider
 import io.github.jan.supabase.postgrest.postgrest
 import io.github.jan.supabase.postgrest.query.Order
 import kotlinx.coroutines.Dispatchers
@@ -12,9 +12,9 @@ import kotlinx.serialization.Serializable
 data class RouteRating(
     val id: Int? = null,
     @SerialName("route_id")   val routeId: String,
-    @SerialName("route_name") val routeName: String,   // nombre de la ruta guardado directamente
+    @SerialName("route_name") val routeName: String,
     @SerialName("user_id")    val userId: String,
-    val score: Int,                                     // 1–5
+    val score: Int,
     val comment: String? = null,
     @SerialName("created_at") val createdAt: String? = null
 )
@@ -49,6 +49,7 @@ class RatingRepository {
                     comment   = comment?.takeIf { it.isNotBlank() }
                 )
             )
+            Unit
         }
     }
 
