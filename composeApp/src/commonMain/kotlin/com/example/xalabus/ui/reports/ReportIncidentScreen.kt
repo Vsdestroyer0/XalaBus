@@ -1,11 +1,16 @@
 package com.example.xalabus.ui.reports
 
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
-import androidx.compose.material.icons.filled.MyLocation
+import androidx.compose.material.icons.filled.AttachFile
+import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.ReportProblem
 import androidx.compose.material.icons.filled.Send
+import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -16,36 +21,39 @@ import com.example.xalabus.ui.viewmodel.IncidentUiState
 import com.example.xalabus.ui.viewmodel.IncidentViewModel
 
 /**
- * CU-13 — Pantalla de reporte de incidente en una ruta.
+ * CU-13 — Reportar algún inconveniente con la ruta.
  *
- * Flujo:
- *  1. Usuario ve las coordenadas actuales (o las ajusta manualmente).
- *  2. Ingresa una descripción del problema.
- *  3. Toca "Enviar" → reporte guardado en Supabase tabla `reportes`.
+ * Flujo normal:
+ *  1. Acceder a la aplicación (registrado — controlado desde App.kt).
+ *  2. Seleccionar la opción de añadir una advertencia.
+ *  3. Tocar el mapa interactivo (MapLibre real) para marcar la ubicación.
+ *  4. Describir la advertencia en el cuadro de texto.
+ *  5. (Opcional) Adjuntar una foto.
+ *  6. Subir la advertencia → el sistema la guarda y la hace visible.
  *
- * FA-01: coordenadas fuera del área de Xalapa → error en ViewModel.
- * FA-02: descripción vacía → error en ViewModel.
- * Ex-01: error al subir → error en ViewModel.
- *
- * Nota: La foto adjunta (campo foto_url) se deja como null en esta versión.
- * Se puede extender con Supabase Storage en una iteración futura.
+ * Casos de prueba cubiertos:
+ *  C1 — flujo feliz
+ *  C2 / FA-01 — Punto fuera de Xalapa → "Punto inválido"
+ *  C3 / FA-02 — Descripción vacía → validación + botón deshabilitado
+ *  C4 / Ex-01 — Error de red/datos  → "Error al cargar datos"
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ReportIncidentScreen(
     viewModel: IncidentViewModel,
+    isDarkMode: Boolean = false,
+    mapStylePath: String? = null,
     onDismiss: () -> Unit
 ) {
-    val uiState    by viewModel.uiState.collectAsState()
+    val uiState     by viewModel.uiState.collectAsState()
     val selectedLat by viewModel.selectedLat.collectAsState()
     val selectedLng by viewModel.selectedLng.collectAsState()
 
-    var descripcion  by remember { mutableStateOf("") }
-    // Campos para edición manual de coordenadas
-    var latText      by remember(selectedLat) { mutableStateOf("%.6f".format(selectedLat)) }
-    var lngText      by remember(selectedLng) { mutableStateOf("%.6f".format(selectedLng)) }
+    var descripcion by remember { mutableStateOf("") }
 
-    // Navegar de vuelta al completar exitosamente
+    val isDescriptionEmpty = descripcion.isBlank()
+    val isPointValid       = IncidentViewModel.isWithinXalapa(selectedLat, selectedLng)
+
     LaunchedEffect(uiState) {
         if (uiState is IncidentUiState.Success) {
             viewModel.resetState()
@@ -72,123 +80,163 @@ fun ReportIncidentScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding)
-                .padding(horizontal = 24.dp, vertical = 16.dp),
+                .verticalScroll(rememberScrollState())
+                .padding(horizontal = 20.dp, vertical = 12.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
 
-            Icon(
-                Icons.Default.ReportProblem,
-                contentDescription = null,
-                modifier = Modifier.size(48.dp).align(Alignment.CenterHorizontally),
-                tint     = MaterialTheme.colorScheme.error
-            )
-
-            Text(
-                "¿Qué está pasando?",
-                style      = MaterialTheme.typography.headlineSmall,
-                fontWeight = FontWeight.Bold,
-                modifier   = Modifier.align(Alignment.CenterHorizontally)
-            )
-
-            // ── Sección de ubicación GPS ──────────────────────────────────────
-            Card(
-                colors = CardDefaults.cardColors(
-                    containerColor = MaterialTheme.colorScheme.surfaceVariant
-                )
+            // ── Encabezado ────────────────────────────────────────────────────
+            Row(
+                verticalAlignment     = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(10.dp)
             ) {
-                Column(modifier = Modifier.padding(12.dp)) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(
-                            Icons.Default.MyLocation,
-                            null,
-                            Modifier.size(20.dp),
-                            tint = MaterialTheme.colorScheme.primary
-                        )
-                        Spacer(Modifier.width(8.dp))
-                        Text(
-                            "Ubicación del incidente",
-                            style = MaterialTheme.typography.titleSmall,
-                            fontWeight = FontWeight.Bold
-                        )
-                    }
-                    Spacer(Modifier.height(8.dp))
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        OutlinedTextField(
-                            value         = latText,
-                            onValueChange = {
-                                latText = it
-                                it.toDoubleOrNull()?.let { d -> viewModel.updateLocation(d, selectedLng) }
-                            },
-                            label    = { Text("Latitud") },
-                            modifier = Modifier.weight(1f),
-                            singleLine = true
-                        )
-                        OutlinedTextField(
-                            value         = lngText,
-                            onValueChange = {
-                                lngText = it
-                                it.toDoubleOrNull()?.let { d -> viewModel.updateLocation(selectedLat, d) }
-                            },
-                            label    = { Text("Longitud") },
-                            modifier = Modifier.weight(1f),
-                            singleLine = true
-                        )
-                    }
-                    Spacer(Modifier.height(4.dp))
+                Icon(
+                    Icons.Default.ReportProblem,
+                    contentDescription = null,
+                    modifier = Modifier.size(28.dp),
+                    tint = MaterialTheme.colorScheme.error
+                )
+                Column {
                     Text(
-                        "Centro de Xalapa: 19.5438, -96.9269",
-                        style = MaterialTheme.typography.labelSmall,
+                        "¿Qué está pasando?",
+                        style      = MaterialTheme.typography.titleLarge,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Text(
+                        "Marca el punto en el mapa y describe el incidente.",
+                        style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
             }
 
-            // ── Descripción del problema ──────────────────────────────────────
-            OutlinedTextField(
-                value         = descripcion,
-                onValueChange = { descripcion = it },
-                label         = { Text("Describe el problema") },
-                placeholder   = { Text("ej. La ruta cambió de dirección, hay tráfico bloqueado...") },
-                modifier      = Modifier.fillMaxWidth().height(140.dp),
-                maxLines      = 5
-            )
-
-            // ── Nota sobre foto (futura extensión) ───────────────────────────
+            // ── Paso 1: Mapa real de Xalapa (MapLibre) ────────────────────────
             Text(
-                "📎 La opción de adjuntar foto estará disponible próximamente.",
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
+                "1. Toca el mapa para marcar la ubicación",
+                style      = MaterialTheme.typography.labelLarge,
+                fontWeight = FontWeight.SemiBold,
+                color      = MaterialTheme.colorScheme.primary
             )
 
-            // ── Mensaje de error ──────────────────────────────────────────────
+            Card(
+                modifier  = Modifier.fillMaxWidth().height(240.dp),
+                shape     = RoundedCornerShape(12.dp),
+                elevation = CardDefaults.cardElevation(defaultElevation = 3.dp)
+            ) {
+                // XalapaIncidentMap: en Android → MapView real de MapLibre
+                //                   en iOS     → placeholder
+                XalapaIncidentMap(
+                    viewModel    = viewModel,
+                    isDarkMode   = isDarkMode,
+                    mapStylePath = mapStylePath,
+                    modifier     = Modifier.fillMaxSize(),
+                )
+            }
+
+            // Chip con coordenadas / error de punto inválido (C2)
+            Row(
+                modifier              = Modifier.fillMaxWidth(),
+                verticalAlignment     = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Icon(
+                    if (isPointValid) Icons.Default.CheckCircle else Icons.Default.Warning,
+                    contentDescription = null,
+                    modifier           = Modifier.size(18.dp),
+                    tint               = if (isPointValid) MaterialTheme.colorScheme.primary
+                                         else MaterialTheme.colorScheme.error
+                )
+                Text(
+                    if (isPointValid)
+                        "Lat: ${"%.4f".format(selectedLat)}  Lng: ${"%.4f".format(selectedLng)}"
+                    else
+                        "Punto inválido — selecciona dentro de Xalapa",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = if (isPointValid) MaterialTheme.colorScheme.onSurfaceVariant
+                             else MaterialTheme.colorScheme.error
+                )
+            }
+
+            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+
+            // ── Paso 2: Descripción ───────────────────────────────────────────
+            Text(
+                "2. Describe el problema",
+                style      = MaterialTheme.typography.labelLarge,
+                fontWeight = FontWeight.SemiBold,
+                color      = MaterialTheme.colorScheme.primary
+            )
+
+            OutlinedTextField(
+                value          = descripcion,
+                onValueChange  = { descripcion = it },
+                label          = { Text("Descripción de la advertencia *") },
+                placeholder    = { Text("ej. Bloqueo de vía, desvío de ruta, tráfico intenso...") },
+                modifier       = Modifier.fillMaxWidth().height(130.dp),
+                maxLines       = 5,
+                isError        = isDescriptionEmpty && uiState is IncidentUiState.Error,
+                supportingText = {
+                    if (isDescriptionEmpty) {
+                        Text(
+                            "Campo obligatorio — debes escribir una descripción.",
+                            color = MaterialTheme.colorScheme.error,
+                            style = MaterialTheme.typography.labelSmall
+                        )
+                    }
+                }
+            )
+
+            // ── Paso 3: Foto opcional (C1) ────────────────────────────────────
+            OutlinedButton(
+                onClick  = { /* extensión futura: Supabase Storage */ },
+                modifier = Modifier.fillMaxWidth(),
+                enabled  = false
+            ) {
+                Icon(Icons.Default.AttachFile, null, Modifier.size(18.dp))
+                Spacer(Modifier.width(8.dp))
+                Text("Adjuntar foto (opcional) — próximamente")
+            }
+
+            // ── Mensaje de error (FA-01, FA-02, Ex-01) ────────────────────────
             if (uiState is IncidentUiState.Error) {
                 Card(
                     colors = CardDefaults.cardColors(
                         containerColor = MaterialTheme.colorScheme.errorContainer
-                    )
+                    ),
+                    shape = RoundedCornerShape(8.dp)
                 ) {
-                    Text(
-                        (uiState as IncidentUiState.Error).message,
-                        modifier = Modifier.padding(12.dp),
-                        color    = MaterialTheme.colorScheme.onErrorContainer,
-                        style    = MaterialTheme.typography.bodySmall
-                    )
+                    Row(
+                        modifier              = Modifier.padding(12.dp),
+                        verticalAlignment     = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Icon(
+                            Icons.Default.Warning,
+                            contentDescription = null,
+                            tint     = MaterialTheme.colorScheme.onErrorContainer,
+                            modifier = Modifier.size(18.dp)
+                        )
+                        Text(
+                            (uiState as IncidentUiState.Error).message,
+                            color = MaterialTheme.colorScheme.onErrorContainer,
+                            style = MaterialTheme.typography.bodySmall
+                        )
+                    }
                 }
             }
 
-            Spacer(Modifier.weight(1f))
+            Spacer(Modifier.height(4.dp))
 
             // ── Botón enviar ──────────────────────────────────────────────────
             Button(
                 onClick  = { viewModel.submitIncidente(descripcion) },
                 modifier = Modifier.fillMaxWidth().height(52.dp),
-                enabled  = descripcion.isNotBlank() && uiState !is IncidentUiState.Loading,
+                enabled  = !isDescriptionEmpty && isPointValid && uiState !is IncidentUiState.Loading,
                 colors   = ButtonDefaults.buttonColors(
-                    containerColor = MaterialTheme.colorScheme.error,
-                    contentColor   = MaterialTheme.colorScheme.onError
+                    containerColor         = MaterialTheme.colorScheme.error,
+                    contentColor           = MaterialTheme.colorScheme.onError,
+                    disabledContainerColor = MaterialTheme.colorScheme.surfaceVariant,
+                    disabledContentColor   = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             ) {
                 if (uiState is IncidentUiState.Loading) {
@@ -197,12 +245,16 @@ fun ReportIncidentScreen(
                         strokeWidth = 2.dp,
                         color       = MaterialTheme.colorScheme.onError
                     )
+                    Spacer(Modifier.width(10.dp))
+                    Text("Enviando...", fontWeight = FontWeight.Bold)
                 } else {
                     Icon(Icons.Default.Send, null, Modifier.size(18.dp))
                     Spacer(Modifier.width(8.dp))
-                    Text("Enviar reporte", fontWeight = FontWeight.Bold)
+                    Text("Subir advertencia", fontWeight = FontWeight.Bold)
                 }
             }
+
+            Spacer(Modifier.height(8.dp))
         }
     }
 }

@@ -32,11 +32,14 @@ import com.example.xalabus.ui.auth.RegisterScreen
 import com.example.xalabus.ui.home.FavoritosScreen
 import com.example.xalabus.ui.home.HomeScreen
 import com.example.xalabus.ui.map.MapScreen
+import com.example.xalabus.ui.ratings.RatingDialog
+import com.example.xalabus.ui.ratings.TopRatedRoutesScreen
 import com.example.xalabus.ui.viewmodel.RouteViewModel
 import com.example.xalabus.ui.onboarding.OnboardingScreen
 import com.example.xalabus.core.prefs.OnboardingPreferences
 import com.example.xalabus.ui.viewmodel.FavoritosViewModel
 import com.example.xalabus.ui.viewmodel.IncidentViewModel
+import com.example.xalabus.ui.viewmodel.RatingViewModel
 import com.example.xalabus.ui.viewmodel.RouteTimeViewModel
 import com.example.xalabus.ui.viewmodel.RouteTimeUiState
 import kotlinx.coroutines.launch
@@ -74,14 +77,16 @@ fun App(
     val reportsViewModel = remember(repository) {
         com.example.xalabus.ui.viewmodel.ReportsViewModel(routeRepository = repository)
     }
-    // CU-03: ViewModel de recuperación de contraseña
+    // CU-03: ViewModel de recuperacion de contrasena
     val forgotPasswordViewModel = remember { ForgotPasswordViewModel() }
     // CU-10: ViewModel de favoritos
     val favoritosViewModel = remember { FavoritosViewModel() }
-    // CU-11: ViewModel de tiempo estimado de traslado (cálculo fijo desde geometría)
+    // CU-11: ViewModel de tiempo estimado de traslado (calculo fijo desde geometria)
     val routeTimeViewModel = remember { RouteTimeViewModel() }
     // CU-13: ViewModel de incidentes GPS
     val incidentViewModel = remember { IncidentViewModel() }
+    // CU-23 / CU-24: ViewModel de calificaciones de rutas
+    val ratingViewModel = remember { RatingViewModel() }
 
     val systemDark  = isSystemInDarkTheme()
     var isDarkMode  by remember { mutableStateOf(systemDark) }
@@ -124,6 +129,7 @@ fun App(
                     driverFactory    = driverFactory,
                     fileManager      = fileManager,
                     viewModel        = viewModel,
+                    authViewModel    = authViewModel,
                     isDarkMode       = isDarkMode,
                     isAuthenticated  = isAuthenticated,
                     onToggleDarkMode = { isDarkMode = !isDarkMode },
@@ -139,7 +145,8 @@ fun App(
                     reportsViewModel   = reportsViewModel,
                     favoritosViewModel = favoritosViewModel,
                     incidentViewModel  = incidentViewModel,
-                    routeTimeViewModel = routeTimeViewModel
+                    routeTimeViewModel = routeTimeViewModel,
+                    ratingViewModel    = ratingViewModel
                 )
 
                 AppDestination.ADMIN_LOGIN -> AdminLoginScreen(
@@ -167,6 +174,7 @@ private fun MainAppContent(
     driverFactory: DriverFactory,
     fileManager: MapFileManager,
     viewModel: RouteViewModel,
+    authViewModel: AuthViewModel,
     isDarkMode: Boolean,
     isAuthenticated: Boolean,
     onToggleDarkMode: () -> Unit,
@@ -176,7 +184,8 @@ private fun MainAppContent(
     reportsViewModel: com.example.xalabus.ui.viewmodel.ReportsViewModel,
     favoritosViewModel: FavoritosViewModel,
     incidentViewModel: IncidentViewModel,
-    routeTimeViewModel: RouteTimeViewModel
+    routeTimeViewModel: RouteTimeViewModel,
+    ratingViewModel: RatingViewModel
 ) {
     LaunchedEffect(Unit) { viewModel.initializeData() }
 
@@ -186,8 +195,14 @@ private fun MainAppContent(
     var showGeneralReport by remember { mutableStateOf(false) }
     // CU-13: controla la pantalla de reporte de incidente con GPS
     var showIncidentReport by remember { mutableStateOf(false) }
-    // CU-10 (extensión): controla la pantalla de rutas favoritas del drawer
+    // CU-10 (extension): controla la pantalla de rutas favoritas del drawer
     var showFavoritos by remember { mutableStateOf(false) }
+    // CU-24: controla la pantalla de rutas mejor calificadas
+    var showTopRated by remember { mutableStateOf(false) }
+    // CU-23: controla el dialogo de calificar ruta (activado desde TopRated o MapDetail)
+    var ratingRouteId   by remember { mutableStateOf("") }
+    var ratingRouteName by remember { mutableStateOf("") }
+    var showRatingDialog by remember { mutableStateOf(false) }
 
     val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
     val scope       = rememberCoroutineScope()
@@ -208,7 +223,7 @@ private fun MainAppContent(
             onDismiss = { showIncidentReport = false }
         )
     } else if (showFavoritos) {
-        // CU-10 (extensión): pantalla completa de rutas favoritas del usuario
+        // CU-10 (extension): pantalla completa de rutas favoritas del usuario
         FavoritosScreen(
             favoritosViewModel = favoritosViewModel,
             routeViewModel     = viewModel,
@@ -218,6 +233,23 @@ private fun MainAppContent(
                 showMap = true
             },
             onDismiss = { showFavoritos = false }
+        )
+    } else if (showTopRated) {
+        // CU-24: pantalla de rutas mejor calificadas (acceso publico)
+        TopRatedRoutesScreen(
+            viewModel    = ratingViewModel,
+            onRouteClick = { routeId ->
+                viewModel.selectRoute(routeId)
+                showTopRated = false
+                showMap = true
+            },
+            onRateRoute  = { routeId, routeName ->
+                // CU-23: el boton calificar de la tarjeta abre el dialogo
+                ratingRouteId   = routeId
+                ratingRouteName = routeName
+                showRatingDialog = true
+            },
+            onDismiss = { showTopRated = false }
         )
     } else {
         ModalNavigationDrawer(
@@ -264,11 +296,32 @@ private fun MainAppContent(
                         color    = MaterialTheme.colorScheme.outline
                     )
 
+                    // CU-24: Rutas mejor calificadas — visible SIEMPRE (sin requerir login)
+                    NavigationDrawerItem(
+                        icon     = { Icon(Icons.Default.Star, contentDescription = null) },
+                        label    = { Text("Rutas Mejor Calificadas") },
+                        selected = false,
+                        onClick  = {
+                            scope.launch { drawerState.close() }
+                            showTopRated = true
+                        },
+                        colors = NavigationDrawerItemDefaults.colors(
+                            unselectedTextColor = MaterialTheme.colorScheme.primary,
+                            unselectedIconColor = MaterialTheme.colorScheme.primary
+                        ),
+                        modifier = Modifier.padding(NavigationDrawerItemDefaults.ItemPadding)
+                    )
+
+                    HorizontalDivider(
+                        modifier = Modifier.padding(vertical = 8.dp),
+                        color    = MaterialTheme.colorScheme.outline
+                    )
+
                     if (isAuthenticated) {
 
-                        // CU-10 (extensión): ver rutas favoritas guardadas
+                        // CU-10 (extension): ver rutas favoritas guardadas
                         NavigationDrawerItem(
-                            icon     = { Icon(Icons.Default.Star, contentDescription = null) },
+                            icon     = { Icon(Icons.Default.Favorite, contentDescription = null) },
                             label    = { Text("Mis Rutas Favoritas") },
                             selected = false,
                             onClick  = {
@@ -282,7 +335,7 @@ private fun MainAppContent(
                             modifier = Modifier.padding(NavigationDrawerItemDefaults.ItemPadding)
                         )
 
-                        // CU-13: opción de reportar incidente con GPS
+                        // CU-13: opcion de reportar incidente con GPS
                         NavigationDrawerItem(
                             icon   = { Icon(Icons.Default.ReportProblem, contentDescription = null) },
                             label  = { Text("Reportar Incidente") },
@@ -306,10 +359,10 @@ private fun MainAppContent(
                         )
                     }
 
-                    // CU-09: panel de administración para revisar paradas
+                    // CU-09: panel de administracion para revisar paradas
                     NavigationDrawerItem(
                         icon   = { Icon(Icons.Default.AdminPanelSettings, contentDescription = null) },
-                        label  = { Text("Administración") },
+                        label  = { Text("Administracion") },
                         selected = false,
                         onClick  = {
                             scope.launch { drawerState.close() }
@@ -326,7 +379,7 @@ private fun MainAppContent(
                     if (isAuthenticated) {
                         NavigationDrawerItem(
                             icon   = { Icon(Icons.Default.Logout, contentDescription = null) },
-                            label  = { Text("Cerrar sesión") },
+                            label  = { Text("Cerrar sesion") },
                             selected = false,
                             onClick  = {
                                 scope.launch { drawerState.close() }
@@ -341,7 +394,7 @@ private fun MainAppContent(
                     } else {
                         NavigationDrawerItem(
                             icon   = { Icon(Icons.Default.Login, contentDescription = null) },
-                            label  = { Text("Iniciar sesión") },
+                            label  = { Text("Iniciar sesion") },
                             selected = false,
                             onClick  = {
                                 scope.launch { drawerState.close() }
@@ -368,11 +421,15 @@ private fun MainAppContent(
                 )
             } else {
                 MapDetailView(
+                    driverFactory      = driverFactory,
                     fileManager        = fileManager,
                     viewModel          = viewModel,
+                    authViewModel      = authViewModel,
                     reportsViewModel   = reportsViewModel,
                     favoritosViewModel = favoritosViewModel,
                     routeTimeViewModel = routeTimeViewModel,
+                    incidentViewModel  = incidentViewModel,
+                    ratingViewModel    = ratingViewModel,
                     isDarkMode         = isDarkMode,
                     isAuthenticated    = isAuthenticated,
                     onBack             = {
@@ -389,17 +446,36 @@ private fun MainAppContent(
                 onDismiss = { showGeneralReport = false }
             )
         }
+
+        // CU-23: dialogo de calificar ruta (puede abrirse desde TopRated o MapDetail)
+        if (showRatingDialog && ratingRouteId.isNotEmpty()) {
+            RatingDialog(
+                routeName = ratingRouteName,
+                routeId   = ratingRouteId,
+                userId    = authViewModel.currentUserId(),
+                viewModel = ratingViewModel,
+                onDismiss = {
+                    showRatingDialog = false
+                    ratingRouteId    = ""
+                    ratingRouteName  = ""
+                }
+            )
+        }
     }
 }
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalResourceApi::class)
 @Composable
 fun MapDetailView(
+    driverFactory: com.example.xalabus.db.DriverFactory,
     fileManager: MapFileManager,
     viewModel: RouteViewModel,
+    authViewModel: AuthViewModel,
     reportsViewModel: com.example.xalabus.ui.viewmodel.ReportsViewModel,
     favoritosViewModel: FavoritosViewModel,
     routeTimeViewModel: RouteTimeViewModel,
+    incidentViewModel: IncidentViewModel,
+    ratingViewModel: RatingViewModel,
     isDarkMode: Boolean,
     isAuthenticated: Boolean,
     onBack: () -> Unit
@@ -421,6 +497,9 @@ fun MapDetailView(
     // CU-11: estado del estimador de tiempo de traslado
     val routeTimeState by routeTimeViewModel.uiState.collectAsState()
 
+    // CU-23: controla la visibilidad del dialogo de calificacion desde MapDetail
+    var showRatingDialog by remember { mutableStateOf(false) }
+
     // Cargar estado de favorito al seleccionar ruta
     LaunchedEffect(routeId) {
         if (routeId.isNotEmpty()) {
@@ -428,7 +507,7 @@ fun MapDetailView(
         }
     }
 
-    // CU-11: calcular duración en cuanto llegan los puntos de la ruta
+    // CU-11: calcular duracion en cuanto llegan los puntos de la ruta
     LaunchedEffect(routePoints) {
         if (routePoints.isNotEmpty()) {
             routeTimeViewModel.calculateFromGeometry(routePoints)
@@ -455,7 +534,7 @@ fun MapDetailView(
                     .fillMaxWidth()
                     .padding(horizontal = 20.dp, vertical = 10.dp)
             ) {
-                // ── Encabezado con nombre de ruta y botón de favorito (CU-10) ──
+                // ── Encabezado con nombre de ruta y boton de favorito (CU-10) ──
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
@@ -474,21 +553,21 @@ fun MapDetailView(
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
-                    // CU-10: Botón favorito (solo si el usuario está autenticado)
+                    // CU-10: Boton favorito (solo si el usuario esta autenticado)
                     if (isAuthenticated) {
                         IconButton(
                             onClick = {
-                                if (isFavorito) {
-                                    favoritosViewModel.removeFromFavorites(routeId)
-                                } else {
-                                    favoritosViewModel.addToFavorites(routeId)
-                                }
+                                if (isFavorito) favoritosViewModel.removeFromFavorites(routeId)
+                                else favoritosViewModel.addToFavorites(routeId)
                             }
                         ) {
                             Icon(
-                                imageVector = if (isFavorito) Icons.Default.Star else Icons.Default.StarBorder,
-                                contentDescription = if (isFavorito) "Quitar de favoritos" else "Agregar a favoritos",
-                                tint = if (isFavorito) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
+                                imageVector = if (isFavorito) Icons.Default.Favorite
+                                              else Icons.Default.FavoriteBorder,
+                                contentDescription = if (isFavorito) "Quitar de favoritos"
+                                                     else "Agregar a favoritos",
+                                tint = if (isFavorito) MaterialTheme.colorScheme.error
+                                       else MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         }
                     }
@@ -521,7 +600,7 @@ fun MapDetailView(
                         if (imageBitmap != null) {
                             Image(
                                 bitmap       = imageBitmap!!,
-                                contentDescription = "Foto del autobús $formattedId",
+                                contentDescription = "Foto del autobus $formattedId",
                                 modifier     = Modifier.fillMaxSize(),
                                 contentScale = ContentScale.Crop
                             )
@@ -557,7 +636,7 @@ fun MapDetailView(
 
                 Spacer(Modifier.height(20.dp))
 
-                // ── Sección de Tarifas ────────────────────────────────────────────
+                // ── Seccion de Tarifas ────────────────────────────────────────────
                 Card(
                     modifier = Modifier.fillMaxWidth(),
                     colors = CardDefaults.cardColors(
@@ -594,7 +673,7 @@ fun MapDetailView(
 
                 Spacer(Modifier.height(16.dp))
 
-                // ── CU-11: Card de duración total del trayecto ─────────────────
+                // ── CU-11: Card de duracion total del trayecto ─────────────────
                 RouteTravelTimeCard(state = routeTimeState)
 
                 Spacer(Modifier.height(8.dp))
@@ -608,6 +687,23 @@ fun MapDetailView(
                 )
 
                 Spacer(Modifier.height(16.dp))
+
+                // ── CU-23: Boton calificar ruta (solo para usuarios autenticados) ──
+                if (isAuthenticated && routeId.isNotEmpty()) {
+                    OutlinedButton(
+                        onClick  = { showRatingDialog = true },
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Icon(
+                            Icons.Default.Star,
+                            contentDescription = null,
+                            modifier = Modifier.size(18.dp)
+                        )
+                        Spacer(Modifier.width(6.dp))
+                        Text("Calificar esta ruta")
+                    }
+                    Spacer(Modifier.height(8.dp))
+                }
 
                 // ── CU-09: Agregar parada ─────────────────────────────────────
                 OutlinedButton(
@@ -630,13 +726,13 @@ fun MapDetailView(
                         Icon(Icons.Default.AddLocation, contentDescription = null)
                         Spacer(Modifier.width(8.dp))
                     }
-                    Text("Aquí hay una parada")
+                    Text("Aqui hay una parada")
                 }
 
                 when {
                     !isAuthenticated -> {
                         Text(
-                            "Inicia sesión para reportar una parada.",
+                            "Inicia sesion para reportar una parada.",
                             style = MaterialTheme.typography.labelSmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             modifier = Modifier.padding(top = 4.dp)
@@ -644,7 +740,7 @@ fun MapDetailView(
                     }
                     userLocation == null -> {
                         Text(
-                            "Activa el GPS para reportar una parada en tu ubicación.",
+                            "Activa el GPS para reportar una parada en tu ubicacion.",
                             style = MaterialTheme.typography.labelSmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             modifier = Modifier.padding(top = 4.dp)
@@ -680,7 +776,7 @@ fun MapDetailView(
                     onValueChange = { routeReportMessage = it },
                     placeholder = {
                         Text(
-                            "Escribe aquí si la ruta cambió...",
+                            "Escribe aqui si la ruta cambio...",
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     },
@@ -706,7 +802,7 @@ fun MapDetailView(
                 }
                 if (reportState is com.example.xalabus.ui.viewmodel.ReportUiState.Success) {
                     Text(
-                        "¡Reporte de ruta enviado!",
+                        "Reporte de ruta enviado!",
                         color = MaterialTheme.colorScheme.primary,
                         style = MaterialTheme.typography.labelSmall
                     )
@@ -755,6 +851,7 @@ fun MapDetailView(
                 viewModel          = viewModel,
                 isDarkMode         = isDarkMode,
                 routeTimeViewModel = routeTimeViewModel,
+                incidentViewModel  = incidentViewModel,
                 onUserLocationChanged = { lat, lng ->
                     viewModel.updateUserLocation(lat, lng)
                 }
@@ -770,10 +867,21 @@ fun MapDetailView(
             }
         }
     }
+
+    // CU-23: dialogo de calificacion desde MapDetail
+    if (showRatingDialog) {
+        RatingDialog(
+            routeName = selectedRoute?.name ?: "",
+            routeId   = routeId,
+            userId    = authViewModel.currentUserId(),
+            viewModel = ratingViewModel,
+            onDismiss = { showRatingDialog = false }
+        )
+    }
 }
 
 /**
- * CU-11: Card compacto que muestra la duración total estimada del trayecto completo.
+ * CU-11: Card compacto que muestra la duracion total estimada del trayecto completo.
  * Velocidad promedio fija: 32 km/h.
  */
 @Composable
@@ -802,7 +910,7 @@ fun RouteTravelTimeCard(state: RouteTimeUiState) {
                 Spacer(Modifier.width(10.dp))
                 Column {
                     Text(
-                        "Duración del trayecto",
+                        "Duracion del trayecto",
                         style = MaterialTheme.typography.labelMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -859,7 +967,7 @@ fun FarePriceItem(label: String, price: String) {
     }
 }
 
-/** Fila de información con icono, etiqueta y valor. */
+/** Fila de informacion con icono, etiqueta y valor. */
 @Composable
 fun InfoItem(icon: ImageVector, label: String, value: String) {
     Row(

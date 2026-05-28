@@ -8,6 +8,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import com.example.xalabus.ui.viewmodel.RouteViewModel
 import com.example.xalabus.ui.viewmodel.RouteTimeViewModel
+import com.example.xalabus.ui.viewmodel.IncidentViewModel
 import com.example.xalabus.core.util.MapFileManager
 
 @Composable
@@ -16,6 +17,7 @@ actual fun MapScreen(
     viewModel: RouteViewModel,
     isDarkMode: Boolean,
     routeTimeViewModel: RouteTimeViewModel,
+    incidentViewModel: IncidentViewModel,
     onUserLocationChanged: (lat: Double, lng: Double) -> Unit
 ) {
     Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
